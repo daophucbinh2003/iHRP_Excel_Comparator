@@ -1,4 +1,3 @@
-// Hàm xử lý chuẩn hóa dữ liệu cấp cao
 export const parseNumSafe = (str) => {
     if (str === null || str === undefined) return 0;
     let s = String(str).replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
