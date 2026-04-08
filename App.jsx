@@ -10,6 +10,8 @@ import { saveAs } from 'file-saver';
 
 import './index.css';
 
+import CompareWorker from './compareWorker?worker';
+
 // MẸO: Gán XLSX vào window để bạn không phải đi sửa các dòng code cũ đang gọi `window.XLSX`
 window.XLSX = XLSX;
 
@@ -89,6 +91,7 @@ function App() {
   const [showMapped, setShowMapped] = useState(false); 
 
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingMsg, setProcessingMsg] = useState('');
   const [results, setResults] = useState(null);
   
   // Filter States
@@ -425,79 +428,6 @@ function App() {
     }
   }, [baseFile, targetFiles]);
 
-  const extractMappedData = (workbook, sheetName, baseColsToExtract, baseKeyColumn, mapping, headerRowIdx) => {
-    const sheet = workbook.Sheets[sheetName];
-    if (!sheet || !sheet['!ref']) return [];
-    
-    const range = window.XLSX.utils.decode_range(sheet['!ref']);
-    const headers = {}; 
-    const seen = {};
-    for (let C = range.s.c; C <= range.e.c; ++C) {
-      const cell = sheet[window.XLSX.utils.encode_cell({ c: C, r: headerRowIdx })];
-      if (cell && cell.v) {
-          const text = String(cell.v).trim();
-          if (seen[text]) {
-              seen[text]++;
-              headers[C] = `${text} (${seen[text]})`;
-          } else {
-              seen[text] = 1;
-              headers[C] = text;
-          }
-      }
-    }
-
-    const targetToBase = {};
-    if (mapping[baseKeyColumn]) targetToBase[mapping[baseKeyColumn]] = baseKeyColumn;
-    baseColsToExtract.forEach(baseCol => {
-       if (mapping[baseCol]) targetToBase[mapping[baseCol]] = baseCol;
-    });
-
-    const data = [];
-    for (let R = headerRowIdx + 1; R <= range.e.r; ++R) {
-      const rowObj = {};
-      let hasKey = false;
-      
-      for (let C = range.s.c; C <= range.e.c; ++C) {
-        const targetHeader = headers[C];
-        if (!targetHeader) continue;
-        const baseHeader = targetToBase[targetHeader];
-        if (!baseHeader) continue;
-        
-        const cell = sheet[window.XLSX.utils.encode_cell({ c: C, r: R })];
-        // Ưu tiên cell.v (raw value) để đảm bảo số không bị format thành chuỗi có dấu phẩy
-        // Chỉ fallback sang cell.w (formatted) nếu cell.v là undefined (VD: ô text thuần)
-        let rawVal;
-        if (cell) {
-          if (cell.v !== undefined && cell.v !== null) {
-            rawVal = cell.v;
-          } else if (cell.w !== undefined) {
-            rawVal = cell.w;
-          } else {
-            rawVal = "";
-          }
-        } else {
-          rawVal = "";
-        }
-        const val = rawVal !== undefined && rawVal !== null ? String(rawVal).trim() : "";
-
-        if (baseHeader === baseKeyColumn && val !== "") {
-          const keyLower = val.toLowerCase();
-          if (keyLower.includes('tổng') || keyLower === 'stt' || keyLower === 'mã' || keyLower.includes('mã nhân viên') || keyLower.includes('mã nv')) {
-             hasKey = false;
-          } else {
-             hasKey = true;
-             rowObj[baseKeyColumn] = val;
-          }
-        }
-        if (baseColsToExtract.includes(baseHeader) || baseHeader === baseKeyColumn) {
-          rowObj[baseHeader] = val;
-        }
-      }
-      if (hasKey) data.push(rowObj);
-    }
-    return data;
-  };
-
   const checkStructureAndProceed = () => {
     setIsProcessing(true);
     setTimeout(() => {
@@ -514,6 +444,7 @@ function App() {
     }
 
     setIsProcessing(true);
+    setProcessingMsg('Khởi tạo tiến trình đối soát...');
     setResults(null);
     diffNavTracker.current = {}; 
     setSelectedEmpIdForTest(''); 
@@ -522,202 +453,40 @@ function App() {
 
     setTimeout(() => {
       try {
-        const formulaColsNeeded = new Set();
-        customFormulas.forEach(f => {
-            if(f.targetCol) {
-                const actual = baseFile.headers.find(h => h.toLowerCase() === f.targetCol.toLowerCase()) || f.targetCol;
-                formulaColsNeeded.add(actual);
-            }
-            
-            const varsList = extractVariables(f.expression);
-            varsList.forEach(colName => {
-                const actual = baseFile.headers.find(h => h.toLowerCase() === colName.toLowerCase()) || colName;
-                formulaColsNeeded.add(actual);
-            });
-        });
-
-        const allColsToExtract = [...new Set([...compareColumns, ...Array.from(formulaColsNeeded)])];
+        const worker = new CompareWorker();
         
-        const baseMapping = baseFile.headers.reduce((acc, h) => ({...acc, [h]: h}), {});
-        const dataGoc = extractMappedData(baseFile.wb, baseFile.sheet, allColsToExtract, keyCol, baseMapping, baseFile.headerRowIdx);
-        const mapGoc = {};
-        dataGoc.forEach(row => mapGoc[row[keyCol]] = row);
-        
-        const targetMaps = targetFiles.map(tf => {
-          const mapping = columnMappings[tf.id] || {};
-          const targetKeyCol = mapping[keyCol];
-          if (!targetKeyCol) return { id: tf.id, name: tf.customName || tf.name, map: {}, hasKey: false, mapping };
-          
-          const data = extractMappedData(tf.wb, tf.sheet, allColsToExtract, keyCol, mapping, tf.headerRowIdx);
-          const map = {};
-          data.forEach(row => map[row[keyCol]] = row);
-          return { id: tf.id, name: tf.customName || tf.name, map, hasKey: true, mapping };
-        });
-
-        let allKeys = new Set(Object.keys(mapGoc));
-        targetMaps.forEach(tm => {
-          Object.keys(tm.map).forEach(k => allKeys.add(k));
-        });
-        allKeys = Array.from(allKeys);
-
-        const compareCells = (v1, v2, colName) => {
-            const rule = advancedRules[colName] || {};
-            let s1 = String(v1 !== undefined && v1 !== null ? v1 : '').trim();
-            let s2 = String(v2 !== undefined && v2 !== null ? v2 : '').trim();
-
-            if (rule.partialMatch) {
-                const n1 = parseNumSafe(s1);
-                const n2 = parseNumSafe(s2);
-                const norm1 = s1.toLowerCase();
-                const norm2 = s2.toLowerCase();
-                if (n1 === null && n2 === null && norm1 && norm2 && (norm1.includes(norm2) || norm2.includes(norm1))) {
-                    return true;
-                }
+        worker.onmessage = (e) => {
+            if (e.data.type === 'progress') {
+                setProcessingMsg(e.data.message);
+            } else if (e.data.type === 'success') {
+                setResults(e.data.results);
+                setCurrentStep(4);
+                setIsProcessing(false);
+                setProcessingMsg('');
+                worker.terminate(); // Đóng Worker giải phóng RAM
+            } else if (e.data.type === 'error') {
+                alert("Lỗi tiến trình ngầm: " + e.data.message);
+                setIsProcessing(false);
+                setProcessingMsg('');
+                worker.terminate();
             }
-
-            if (rule.roundNumber) {
-                const n1 = parseNumSafe(s1);
-                const n2 = parseNumSafe(s2);
-                
-                if (n1 !== null && n2 !== null) {
-                    const dec = rule.decimals !== undefined ? rule.decimals : 2; 
-                    if (n1.toFixed(dec) === n2.toFixed(dec)) return true;
-                    return false; 
-                }
-            }
-
-            // Normalization comparison if no rules matched
-            const normalize = (v) => {
-                if (v === null || v === undefined) return '0'; 
-                if (typeof v === 'number') return parseFloat(v.toFixed(4)).toString();
-                let s = String(v).replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
-                if (s === '' || s === '-') return '0';
-                let isNegative = false;
-                let checkStr = s;
-                if (checkStr.startsWith('(') && checkStr.endsWith(')')) {
-                    isNegative = true;
-                    checkStr = checkStr.slice(1, -1).trim();
-                } else if (checkStr.startsWith('-')) {
-                    isNegative = true;
-                    checkStr = checkStr.slice(1).trim();
-                }
-                const commaCount = (checkStr.match(/,/g) || []).length;
-                const dotCount = (checkStr.match(/\./g) || []).length;
-                let numStr = checkStr;
-                if (commaCount > 0 && dotCount > 0) {
-                    if (checkStr.lastIndexOf(',') > checkStr.lastIndexOf('.')) numStr = checkStr.replace(/\./g, '').replace(',', '.');
-                    else numStr = checkStr.replace(/,/g, '');
-                } else if (commaCount > 1) {
-                    numStr = checkStr.replace(/,/g, '');
-                } else if (commaCount === 1) {
-                    numStr = checkStr.replace(',', '.');
-                } else if (dotCount > 1) {
-                    numStr = checkStr.replace(/\./g, '');
-                }
-                numStr = numStr.replace(/\s+/g, '');
-                if (numStr !== '' && !isNaN(numStr)) {
-                    const finalNum = isNegative ? -parseFloat(numStr) : parseFloat(numStr);
-                    return parseFloat(finalNum.toFixed(4)).toString();
-                }
-                // FIX ISSUE 1: Normalize chữ về lowercase để so sánh không phân biệt hoa/thường
-                return s.replace(/\s+/g, ' ').toLowerCase().normalize('NFC');
-            };
-
-            return normalize(s1) === normalize(s2);
         };
 
-        const errors = [];
-
-        allKeys.forEach(key => {
-          const rowGoc = mapGoc[key];
-          let hasDiff = false;
-          let isMissing = false;
-          let isPerfectMatch = true;
-          
-          const diffRow = { 
-            [keyCol]: key, 
-            status: [], 
-            diffCells: {},
-            baseVals: { ...(rowGoc || {}) },
-            targetVals: {} 
-          };
-
-          if (!rowGoc) {
-            hasDiff = true;
-            isMissing = true;
-            isPerfectMatch = false;
-            diffRow.status.push('Chỉ có ở Target');
-          }
-
-          targetMaps.forEach((tm) => {
-            if (!tm.hasKey) {
-              hasDiff = true;
-              isPerfectMatch = false;
-              diffRow.targetVals[tm.id] = { _error: 'Không có Key' };
-              return; 
-            }
-
-            const rowT = tm.map[key];
-            diffRow.targetVals[tm.id] = { ...(rowT || {}) }; 
-
-            if (!rowT) {
-              hasDiff = true;
-              isMissing = true;
-              isPerfectMatch = false;
-              diffRow.status.push(`Thiếu ở ${tm.name}`);
-            } else if (rowGoc) {
-              compareColumns.forEach(col => {
-                if (!tm.mapping[col]) {
-                  hasDiff = true;
-                  isPerfectMatch = false;
-                  diffRow.diffCells[`${col}_${tm.id}`] = true;
-                  diffRow.targetVals[tm.id][col] = ' Bỏ qua/Thiếu';
-                } else {
-                  let valG = diffRow.baseVals[col];
-                  let valT = diffRow.targetVals[tm.id][col];
-                  
-                  const rule = advancedRules[col] || {};
-                  if (rule.roundNumber) {
-                      const dec = (rule.decimals !== undefined && rule.decimals !== '') ? parseInt(rule.decimals, 10) : 2;
-                      const n1 = parseNumSafe(valG);
-                      if (n1 !== null) {
-                          valG = Number(n1.toFixed(dec));
-                          diffRow.baseVals[col] = valG; // Cập nhật trực tiếp số liệu hiển thị
-                      }
-                      const n2 = parseNumSafe(valT);
-                      if (n2 !== null && valT !== ' Bỏ qua/Thiếu') {
-                          valT = Number(n2.toFixed(dec));
-                          diffRow.targetVals[tm.id][col] = valT; // Cập nhật trực tiếp số liệu hiển thị
-                      }
-                  }
-
-                  if (!compareCells(valG, valT, col)) {
-                    hasDiff = true;
-                    isPerfectMatch = false;
-                    diffRow.diffCells[`${col}_Gốc`] = true;
-                    diffRow.diffCells[`${col}_${tm.id}`] = true;
-                  }
-                }
-              });
-            }
-          });
-
-          if (diffRow.status.length === 0) diffRow.status = [];
-          
-          diffRow.isMatch = isPerfectMatch;
-          diffRow.isDiff = hasDiff && !isMissing;
-          diffRow.isMissing = isMissing;
-
-          errors.push(diffRow);
+        // Đẩy dữ liệu sang luồng Worker
+        worker.postMessage({
+            baseFile: { wb: baseFile.wb, sheet: baseFile.sheet, headers: baseFile.headers, headerRowIdx: baseFile.headerRowIdx },
+            targetFiles: targetFiles.map(tf => ({ wb: tf.wb, sheet: tf.sheet, headers: tf.headers, headerRowIdx: tf.headerRowIdx, id: tf.id, customName: tf.customName, name: tf.name })),
+            columnMappings,
+            keyCol,
+            compareColumns,
+            customFormulas,
+            advancedRules
         });
-
-        setResults(errors);
-        setCurrentStep(4);
       } catch (err) {
         console.error(err);
-        alert("Có lỗi xảy ra: " + err.message);
-      } finally {
+        alert("Không thể khởi tạo Web Worker: " + err.message);
         setIsProcessing(false);
+        setProcessingMsg('');
       }
     }, 200);
   };
@@ -1800,7 +1569,10 @@ function App() {
 
         <div className="mt-6 flex justify-end">
           <button onClick={runMultiComparison} disabled={isProcessing || availableCols.length === 0 || valCols.length === 0} className={`flex items-center px-8 py-2.5 rounded font-bold text-white shadow-sm transition-colors ${isProcessing || availableCols.length === 0 || valCols.length === 0 ? 'bg-slate-600 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500'}`}>
-            {isProcessing ? 'Đang xử lý...' : <><svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> BẮT ĐẦU ĐỐI SOÁT</>}
+                    {isProcessing 
+                        ? (processingMsg || 'Đang xử lý...') 
+                        : <><svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> BẮT ĐẦU ĐỐI SOÁT</>
+                    }
           </button>
         </div>
       </div>
