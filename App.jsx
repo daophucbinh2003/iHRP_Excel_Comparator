@@ -5,6 +5,9 @@ import SearchableSelect from './SearchableSelect';
 import { parseNumSafe } from './formatters';
 import { tokenizeSQL, extractVariables, evaluateFormula } from './astCompiler';
 
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
+
 import './index.css';
 
 // MẸO: Gán XLSX vào window để bạn không phải đi sửa các dòng code cũ đang gọi `window.XLSX`
@@ -917,6 +920,126 @@ function App() {
     return count;
   };
 
+  const handleExportExcel = async () => {
+    if (!filteredResults || filteredResults.length === 0) {
+        alert("Không có dữ liệu để xuất!");
+        return;
+    }
+
+    setIsProcessing(true);
+    try {
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet("Báo Cáo Đối Soát", {
+            views: [{ state: 'frozen', xSplit: 2, ySplit: 2 }] // Đóng băng 2 cột đầu, 2 dòng đầu
+        });
+
+        // 1. TẠO HEADER ĐA TẦNG VÀ GỘP Ô
+        const headerRow1 = [keyCol, 'Trạng Thái Kết Quả'];
+        const headerRow2 = ['', ''];
+        const merges = [];
+        let colIndex = 3; // Cột số 3 trong ExcelJS
+
+        visibleValCols.forEach(col => {
+            headerRow1.push(col);
+            headerRow2.push('GỐC');
+            targetFiles.forEach(tf => {
+                headerRow1.push(''); // Ô trống để tí nữa gộp lại
+                headerRow2.push(tf.customName || tf.name);
+            });
+            
+            const startMerge = colIndex;
+            const endMerge = colIndex + targetFiles.length;
+            merges.push([1, startMerge, 1, endMerge]);
+            colIndex = endMerge + 1;
+        });
+
+        worksheet.addRow(headerRow1);
+        worksheet.addRow(headerRow2);
+
+        worksheet.mergeCells('A1:A2');
+        worksheet.mergeCells('B1:B2');
+        merges.forEach(m => worksheet.mergeCells(m[0], m[1], m[2], m[3]));
+
+        // 2. STYLE CHO HEADER (MÀU XANH, CHỮ TRẮNG, KẺ KHUNG)
+        for (let i = 1; i <= 2; i++) {
+            worksheet.getRow(i).eachCell((cell) => {
+                cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F81BD' } };
+                cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+            });
+        }
+
+        // 3. ĐIỀN DỮ LIỆU & TỰ ĐỘNG BÔI ĐỎ Ô SAI LỆCH
+        filteredResults.forEach(row => {
+            const rowData = [
+                row[keyCol],
+                row.status.length > 0 ? row.status.join(', ') : (row.isDiff ? 'Có sai lệch' : 'Khớp 100%')
+            ];
+            
+            visibleValCols.forEach(col => {
+                rowData.push(row.baseVals[col] !== undefined ? row.baseVals[col] : '-');
+                targetFiles.forEach(tf => {
+                    const tVal = row.targetVals[tf.id]?.[col];
+                    rowData.push(tVal !== undefined ? tVal : '-');
+                });
+            });
+
+            const addedRow = worksheet.addRow(rowData);
+
+            // Kẻ khung và set style cơ bản cho toàn bộ ô trong dòng
+            addedRow.eachCell((cell, colNumber) => {
+                cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+                cell.alignment = { vertical: 'middle', wrapText: true };
+                
+                // Tô màu chữ đỏ cho cột Trạng thái nếu có lỗi
+                if (colNumber === 2 && row.isDiff) cell.font = { color: { argb: 'FFFF0000' }, bold: true };
+            });
+
+            // Quét các cột Target xem ô nào bị lệch so với gốc thì tô nền đỏ
+            let colTrack = 2; 
+            visibleValCols.forEach(col => {
+                colTrack++; // Nhảy qua cột GỐC
+                targetFiles.forEach(tf => {
+                    colTrack++; // Di chuyển sang cột Target
+                    if (row.diffCells[`${col}_${tf.id}`]) {
+                        const errorCell = addedRow.getCell(colTrack);
+                        errorCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC7CE' } }; // Nền đỏ nhạt
+                        errorCell.font = { color: { argb: 'FF9C0006' }, bold: true }; // Chữ đỏ đậm
+                    } else if (row.targetVals[tf.id]?.[col] === ' Bỏ qua/Thiếu') {
+                        const skipCell = addedRow.getCell(colTrack);
+                        skipCell.font = { color: { argb: 'FF999999' }, italic: true }; // Chữ xám in nghiêng
+                    }
+                });
+            });
+        });
+
+        // 4. TỰ ĐỘNG CĂN CHỈNH BỀ RỘNG CỘT
+        worksheet.columns.forEach(column => {
+            let maxLen = 10;
+            column.eachCell({ includeEmpty: true }, cell => {
+                if (cell.value) {
+                    const len = cell.value.toString().length;
+                    if (len > maxLen) maxLen = len;
+                }
+            });
+            column.width = Math.min(maxLen + 2, 45); // Set tối đa 45 để cột không bị kéo ra quá dài
+        });
+
+        // 5. XUẤT RA TRÌNH DUYỆT
+        const buffer = await workbook.xlsx.writeBuffer();
+        saveAs(new Blob([buffer]), `iHRP_Bao_Cao_Doi_Soat_${new Date().getTime()}.xlsx`);
+        
+        setToastMessage(`Đã xuất báo cáo chi tiết ${filteredResults.length} dòng thành công!`);
+        setTimeout(() => setToastMessage(''), 3000);
+    } catch (err) {
+        console.error(err);
+        alert("Lỗi xuất file Excel: " + err.message);
+    } finally {
+        setIsProcessing(false);
+    }
+  };
+
   // PAGINATION LOGIC
   const totalPages = Math.ceil(filteredResults.length / rowsPerPage);
   const currentResults = filteredResults.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
@@ -1671,13 +1794,6 @@ function App() {
   {currentStep === 3 && (
     <div className="animate-fade-in space-y-5">
       <div className={`${themeUI.cardBg} p-5 rounded-xl shadow-sm border transition-colors`}>
-        <div className={`mb-5 ${isDarkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50/50 border-blue-100'} p-3 rounded-lg border gap-3`}>
-          <p className={`${isDarkMode ? 'text-blue-300' : 'text-blue-800'} flex items-center font-medium text-sm`}>
-            <svg className="w-4 h-4 mr-2 text-blue-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            Chỉ cần chọn cột KEY. Hệ thống sẽ tự động đối soát toàn bộ các cột còn lại, trừ cột KEY và các cột STT.
-          </p>
-        </div>
-
         <div className="mb-6">
           <label className={`block font-bold ${themeUI.textTitle} mb-2 flex items-center`}>
              Chọn Cột KEY <span className={`${themeUI.textMuted} font-normal ml-1`}>(Dùng làm mốc)</span>
@@ -1696,30 +1812,6 @@ function App() {
         </div>
 
         <div className="grid grid-cols-1 gap-5">
-          <div className={`${themeUI.innerBox} p-4 rounded-lg shadow-inner border`}>
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                <div>
-                  <label className={`font-bold ${themeUI.textTitle}`}>Phạm vi so sánh tự động</label>
-                  <p className={`text-xs mt-1 ${themeUI.textMuted}`}>Các cột sau sẽ được hệ thống tự động đưa vào đối soát.</p>
-                </div>
-                <div className={`px-3 py-2 rounded-lg border text-sm font-bold w-max ${isDarkMode ? 'bg-slate-800 border-slate-600 text-blue-300' : 'bg-white border-blue-200 text-blue-700'}`}>
-                  {valCols.length} cột được so sánh
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {valCols.length > 0 ? valCols.map(col => (
-                  <span key={`auto-col-${col}`} className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${isDarkMode ? 'bg-slate-800 border-slate-600 text-slate-200' : 'bg-white border-gray-200 text-gray-700'}`} title={col}>
-                    {col}
-                  </span>
-                )) : (
-                  <span className={`text-sm ${themeUI.textMuted}`}>Chưa có cột dữ liệu hợp lệ để đối soát.</span>
-                )}
-              </div>
-            </div>
-          </div>
-
           <div className={`${themeUI.innerBox} p-4 rounded-lg shadow-inner border`}>
             <h3 className={`text-base font-bold ${themeUI.textTitle} mb-4 flex items-center`}>
               <svg className={`w-4 h-4 mr-2 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
@@ -1853,6 +1945,11 @@ function App() {
            <button onClick={() => setShowAdvancedOptions(true)} className={`flex items-center gap-2 px-3 py-1.5 rounded font-bold text-xs border transition-colors ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-green-400' : 'bg-white border-gray-300 hover:bg-gray-100 text-green-700'}`}>
               <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
               Cấu hình nâng cao
+           </button>
+
+           <button onClick={handleExportExcel} disabled={isProcessing} className={`flex items-center gap-2 px-3 py-1.5 rounded font-bold text-xs border transition-colors ${isDarkMode ? 'bg-emerald-900/30 border-emerald-700 hover:bg-emerald-800 text-emerald-400' : 'bg-emerald-50 border-emerald-300 hover:bg-emerald-100 text-emerald-700'}`} title="Xuất dữ liệu đang hiển thị ra file Excel">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+              Xuất Excel
            </button>
 
            <div className="relative" ref={colMenuRef}>
