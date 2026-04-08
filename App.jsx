@@ -32,7 +32,6 @@ function App() {
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const [advSelectedCol, setAdvSelectedCol] = useState(''); 
   const [advSearchCol, setAdvSearchCol] = useState(''); 
-  const [advColType, setAdvColType] = useState(null); 
   const [isAdvComboOpen, setIsAdvComboOpen] = useState(false); 
 
   // --- FORMULA ASSISTANT STATES ---
@@ -228,68 +227,6 @@ function App() {
     if (!Array.isArray(headers)) return [];
     return headers.filter(col => col !== keyColumn && !isSTT(col));
   };
-
-  const guessColumnType = (colName) => {
-      if (!baseFile || !baseFile.wb || !baseFile.sheet) return 'text';
-      const sheet = baseFile.wb.Sheets[baseFile.sheet];
-      if (!sheet || !sheet['!ref']) return 'text';
-      
-      const range = window.XLSX.utils.decode_range(sheet['!ref']);
-      let colIdx = -1;
-
-      for (let C = range.s.c; C <= range.e.c; ++C) {
-          const cell = sheet[window.XLSX.utils.encode_cell({ c: C, r: baseFile.headerRowIdx })];
-          if (cell && String(cell.v).trim() === colName) {
-              colIdx = C; break;
-          }
-      }
-
-      if (colIdx === -1) return 'text';
-
-      let numCount = 0;
-      let textCount = 0;
-      let checkedRows = 0;
-
-      for (let R = baseFile.headerRowIdx + 1; R <= Math.min(range.e.r, baseFile.headerRowIdx + 50); ++R) {
-          const cell = sheet[window.XLSX.utils.encode_cell({ c: colIdx, r: R })];
-          if (!cell) continue;
-          
-          let val = cell.v; 
-          if (val === undefined || val === null || val === '') continue;
-
-          checkedRows++;
-          
-          if (typeof val === 'number') {
-              numCount++;
-          } else {
-              let s = String(val).trim().replace(/\s+/g, '');
-              if (s === '-') {
-                  numCount++; 
-                  continue;
-              }
-              if (s.startsWith('(') && s.endsWith(')')) s = s.slice(1, -1);
-              else if (s.startsWith('-')) s = s.slice(1);
-
-              if (/[a-zA-Z]/.test(s)) {
-                  textCount++;
-              } else if (/^[\d\.,]+$/.test(s)) {
-                  numCount++;
-              } else {
-                  textCount++;
-              }
-          }
-          if (checkedRows >= 30) break; 
-      }
-      return numCount >= textCount ? 'number' : 'text';
-  };
-
-  useEffect(() => {
-      if (advSelectedCol) {
-          setAdvColType(guessColumnType(advSelectedCol));
-      } else {
-          setAdvColType(null);
-      }
-  }, [advSelectedCol, baseFile]);
 
 
   // --- LOGIC QUÉT HEADER TỐI ƯU ---
@@ -701,7 +638,7 @@ function App() {
             [keyCol]: key, 
             status: [], 
             diffCells: {},
-            baseVals: rowGoc || {},
+            baseVals: { ...(rowGoc || {}) },
             targetVals: {} 
           };
 
@@ -736,8 +673,24 @@ function App() {
                   diffRow.diffCells[`${col}_${tm.id}`] = true;
                   diffRow.targetVals[tm.id][col] = ' Bỏ qua/Thiếu';
                 } else {
-                  const valG = rowGoc[col];
-                  const valT = rowT[col];
+                  let valG = diffRow.baseVals[col];
+                  let valT = diffRow.targetVals[tm.id][col];
+                  
+                  const rule = advancedRules[col] || {};
+                  if (rule.roundNumber) {
+                      const dec = (rule.decimals !== undefined && rule.decimals !== '') ? parseInt(rule.decimals, 10) : 2;
+                      const n1 = parseNumSafe(valG);
+                      if (n1 !== null) {
+                          valG = Number(n1.toFixed(dec));
+                          diffRow.baseVals[col] = valG; // Cập nhật trực tiếp số liệu hiển thị
+                      }
+                      const n2 = parseNumSafe(valT);
+                      if (n2 !== null && valT !== ' Bỏ qua/Thiếu') {
+                          valT = Number(n2.toFixed(dec));
+                          diffRow.targetVals[tm.id][col] = valT; // Cập nhật trực tiếp số liệu hiển thị
+                      }
+                  }
+
                   if (!compareCells(valG, valT, col)) {
                     hasDiff = true;
                     isPerfectMatch = false;
@@ -1370,9 +1323,6 @@ function App() {
                   <div className={`p-4 border rounded-xl shadow-inner ${isDarkMode ? 'bg-slate-800/50 border-slate-600' : 'bg-blue-50/30 border-blue-100'}`}>
                       <div className="flex justify-between items-center mb-4">
                           <label className={`font-bold text-sm block ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>2. Thiết lập quy tắc cho cột "{advSelectedCol}"</label>
-                          <span className={`px-2 py-1 text-[10px] font-bold uppercase rounded border ${advColType === 'number' ? 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-700/50' : 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-700/50'}`}>
-                              Dữ liệu mẫu: {advColType === 'number' ? 'SỐ' : 'CHỮ'}
-                          </span>
                       </div>
 
                       <div className="flex flex-col gap-4">
@@ -1413,22 +1363,22 @@ function App() {
                                   }}
                               />
                               <div className="w-full">
-                                  <span className={`font-bold block ${themeUI.textMain}`}>Làm tròn đến chữ số thập phân thứ...</span>
-                                  <p className={`text-xs mt-1 mb-2 ${themeUI.textMuted}`}>Dùng cho dữ liệu số. Hệ thống sẽ làm tròn cả hai bên trước khi so sánh.</p>
+                                      <span className={`font-bold block ${themeUI.textMain}`}>Làm tròn số liệu (Round)</span>
+                                      <p className={`text-xs mt-1 mb-2 ${themeUI.textMuted}`}>Dùng cho dữ liệu số. Hệ thống sẽ làm tròn và tự động sửa kết quả hiển thị của dòng đó.</p>
                                   {advancedRules[advSelectedCol]?.roundNumber && (
                                       <div className={`flex items-center gap-2.5 mt-3 p-2.5 rounded-lg border w-max transition-colors ${isDarkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-white border-gray-200 shadow-sm'}`}>
                                           <span className={`text-xs font-bold ${themeUI.textMain}`}>Làm tròn đến</span>
                                           <input
-                                              type="number" min="0" max="10"
+                                                  type="number"
                                               className={`w-16 p-1 text-center font-bold text-sm border rounded focus:outline-none focus:ring-2 focus:ring-purple-500 ${isDarkMode ? 'bg-slate-700 text-white border-slate-500 focus:bg-slate-600' : 'bg-white text-gray-900 border-gray-300 focus:bg-gray-50'}`}
                                               value={advancedRules[advSelectedCol]?.decimals !== undefined ? advancedRules[advSelectedCol].decimals : 2}
                                               onChange={(e) => {
-                                                  const nextDecimals = Math.max(0, Math.min(10, parseInt(e.target.value, 10) || 0));
+                                                      let val = e.target.value;
                                                   setAdvancedRules({
                                                       ...advancedRules,
                                                       [advSelectedCol]: {
                                                           ...advancedRules[advSelectedCol],
-                                                          decimals: nextDecimals
+                                                              decimals: val === '' ? '' : parseInt(val, 10)
                                                       }
                                                   })
                                               }}
@@ -1455,7 +1405,7 @@ function App() {
                                           ? '• Chữ & Số' 
                                           : advancedRules[k].partialMatch 
                                               ? '• Khớp chữ' 
-                                              : `• Tròn ${advancedRules[k].decimals ?? 2} số`
+                                              : `• Tròn ${advancedRules[k].decimals !== undefined && advancedRules[k].decimals !== '' ? advancedRules[k].decimals : 2} số`
                                       }
                                   </span>
                                   <button
