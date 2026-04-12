@@ -66,11 +66,44 @@ export const extractVariables = (expr) => {
     try {
         const tokens = tokenizeSQL(expr);
         const vars = new Set();
-        tokens.forEach(t => {
-            if (t.type === 'VAR') vars.add(t.value);
-        });
+        
+        // Danh sách đen các hàm SQL/Math và từ khóa phổ biến
+        const functionBlacklist = new Set([
+            'round', 'abs', 'floor', 'ceiling', 'isnull', 'coalesce', 
+            'getdate', 'datediff', 'dateadd', 'convert', 'cast',
+            'sum', 'avg', 'max', 'min', 'count', 'len', 'replace',
+            'substring', 'left', 'right', 'charindex', 'ltrim', 'rtrim',
+            'case', 'when', 'then', 'else', 'end', 'and', 'or', 'not', 'in', 'is', 'null', 'like'
+        ]);
+
+        for (let i = 0; i < tokens.length; i++) {
+            const t = tokens[i];
+            
+            if (t.type === 'VAR') {
+                const valLower = t.value.toLowerCase();
+                
+                // 1. Kiểm tra Rule 1: Nếu tiếp theo là dấu '(', đó là lời gọi hàm -> Bỏ qua
+                const nextToken = tokens[i + 1];
+                if (nextToken && nextToken.type === 'PUNC' && nextToken.value === '(') {
+                    continue;
+                }
+
+                // 2. Kiểm tra Rule 2: Nếu nằm trong danh sách Blacklist -> Bỏ qua
+                if (functionBlacklist.has(valLower)) {
+                    continue;
+                }
+
+                // 3. Nếu là định danh kiểu dbo.schema -> Thường là hàm trong context này
+                if (t.value.includes('.') && valLower.startsWith('dbo.')) {
+                    continue;
+                }
+
+                vars.add(t.value);
+            }
+        }
         return Array.from(vars);
     } catch(e) {
+        console.error("Variable Extraction Error:", e);
         return [];
     }
 };
