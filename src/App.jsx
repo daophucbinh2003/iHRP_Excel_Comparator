@@ -11,14 +11,13 @@ import TopNavbar from './components/layout/TopNavbar';
 import ToastNotification from './components/common/ToastNotification';
 import StepHeader from './components/layout/StepHeader';
 
-
 import './index.css';
 import { useThemeContext } from './context/ThemeContext';
 import { useWorkflow } from './context/WorkflowContext';
 import { useFormula } from './context/FormulaContext';
 import { useComparison } from './context/ComparisonContext';
 
-// MẸO: Gán XLSX vào window để bạn không phải đi sửa các dòng code cũ đang gọi `window.XLSX`
+// Gán XLSX vào window để các module cũ gọi window.XLSX vẫn hoạt động
 window.XLSX = XLSX;
 
 function App() {
@@ -28,17 +27,8 @@ function App() {
   const { results } = useComparison();
 
   useEffect(() => {
-    // Check if XLSX is loaded globally
-    if (window.XLSX) {
-       setXlsxLoaded(true);
-    } else {
-       const checkXlsx = setInterval(() => {
-           if (window.XLSX) {
-               setXlsxLoaded(true);
-               clearInterval(checkXlsx);
-           }
-       }, 200);
-    }
+    // window.XLSX được gán đồng bộ ở trên, luôn available tại thời điểm này
+    setXlsxLoaded(!!window.XLSX);
   }, []);
 
   useEffect(() => {
@@ -47,8 +37,8 @@ function App() {
         setIsSandboxComboOpen(false);
       }
     }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [setIsSandboxComboOpen]);
 
   if (!xlsxLoaded) {
@@ -57,7 +47,7 @@ function App() {
 
   return (
     <div className={`flex flex-col h-screen overflow-hidden text-[13px] transition-colors ${themeUI.appBg} ${isDarkMode ? 'dark' : ''}`}>
-      
+
       {/* TOAST NOTIFICATION */}
       <ToastNotification message={toastMessage} />
 
@@ -72,32 +62,29 @@ function App() {
 
       <StepHeader />
 
-{/* NỘI DUNG CHÍNH */}
-<main className={`flex-1 overflow-y-auto p-4 md:p-6 relative ${isDarkMode ? 'custom-dark-scrollbar' : 'custom-light-scrollbar'}`}>
-<div className={`mx-auto h-full flex flex-col ${[2, 4, 'formula'].includes(currentStep) ? 'w-full max-w-[100%]' : 'max-w-5xl'}`}>
-  
-  {/* ================= STEP 1: UPLOAD ================= */}
-  {currentStep === 1 && <UploadStep />}
+      {/* NỘI DUNG CHÍNH */}
+      <main className={`flex-1 overflow-y-auto p-4 md:p-6 relative ${isDarkMode ? 'custom-dark-scrollbar' : 'custom-light-scrollbar'}`}>
+        <div className={`mx-auto h-full flex flex-col ${[2, 4, 'formula'].includes(currentStep) ? 'w-full max-w-[100%]' : 'max-w-5xl'}`}>
 
-  {/* ================= STEP 2: MAPPING (KIỂM TRA GÁN CỘT) ================= */}
-  {currentStep === 2 && <MappingStep />}
+          {/* STEP 1: UPLOAD */}
+          {currentStep === 1 && <UploadStep />}
 
-  {/* ================= STEP 3: CONFIG ================= */}
-  {currentStep === 3 && <ConfigStep />}
+          {/* STEP 2: MAPPING */}
+          {currentStep === 2 && <MappingStep />}
 
-  {/* ================= STEP 'rename' ================= */}
-  {currentStep === 'rename' && <ConfigStep />}
+          {/* STEP 3 / RENAME: CONFIG */}
+          {(currentStep === 3 || currentStep === 'rename') && <ConfigStep />}
 
-  {/* ================= STEP 4: RESULTS ================= */}
-  {currentStep === 4 && results !== null && <ResultsStep />}
+          {/* STEP 4: RESULTS */}
+          {currentStep === 4 && results !== null && <ResultsStep />}
 
-  {/* ================= STEP 'formula' (TRỢ LÝ CÔNG THỨC) ================= */}
-  {currentStep === 'formula' && <FormulaAssistant />}
+          {/* STEP formula: TRỢ LÝ CÔNG THỨC */}
+          {currentStep === 'formula' && <FormulaAssistant />}
 
-</div>
-</main>
-</div>
-);
+        </div>
+      </main>
+    </div>
+  );
 }
 
 export default App;

@@ -4,6 +4,7 @@ import SearchableSelect from '../../components/common/SearchableSelect';
 import { useThemeContext } from '../../context/ThemeContext';
 import { useWorkflow } from '../../context/WorkflowContext';
 import { useComparison } from '../../context/ComparisonContext';
+import { normalizeHeader } from '../../utils/excelUtils';
 
 
 export function MappingStep() {
@@ -48,7 +49,7 @@ export function MappingStep() {
                         {mappingColsToShow.length === 0 ? (
                             <tr>
                                 <td colSpan={targetFiles.length + 1} className={`p-8 text-center ${themeUI.textMuted} align-top`}>
-                                    {(!showMapped && baseFile && targetFiles.every(tf => baseFile.headers.every(h => tf.headers.includes(h)))) ? (
+                                    {(!showMapped && baseFile && targetFiles.every(tf => baseFile.headers.every(h => tf.headers.some(th => normalizeHeader(th) === normalizeHeader(h))))) ? (
                                         <div className="flex flex-col items-center justify-center space-y-2 py-4">
                                             <span className={`font-bold text-sm ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>Tất cả các cột đã tự động khớp tên 100%</span>
                                         </div>
@@ -59,12 +60,12 @@ export function MappingStep() {
                             </tr>
                         ) : (
                             mappingColsToShow.map(bCol => {
-                                const hasMissing = targetFiles.some(tf => !tf.headers.includes(bCol) && !columnMappings[tf.id]?.[bCol]);
+                                const hasMissing = targetFiles.some(tf => !tf.headers.some(h => normalizeHeader(h) === normalizeHeader(bCol)) && !columnMappings[tf.id]?.[bCol]);
                                 return (
                                     <tr key={`map-tr-${bCol}`} className={`border-b transition-colors ${hasMissing ? (isDarkMode ? 'bg-red-900/10 hover:bg-red-900/20' : 'bg-red-50/40 hover:bg-red-50') : themeUI.tableRow} ${themeUI.border}`}>
                                         <td className={`px-4 py-2.5 border-r font-bold sticky left-0 z-10 text-xs ${themeUI.border} ${themeUI.tableCellBg} ${themeUI.textMain}`}>{bCol}</td>
                                         {targetFiles.map(tf => {
-                                            const exactMatch = tf.headers.includes(bCol);
+                                            const exactMatch = tf.headers.some(h => normalizeHeader(h) === normalizeHeader(bCol));
                                             const currentMap = columnMappings[tf.id]?.[bCol];
                                             const isMissingCell = !exactMatch && !currentMap;
                                             return (

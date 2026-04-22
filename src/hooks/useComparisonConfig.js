@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { isSTT } from '../utils/excelUtils'; // Import isSTT
+import { isSTT, normalizeHeader, stringSimilarity } from '../utils/excelUtils'; // Import isSTT
 
 const getAutoCompareColumns = (headers, keyColumn) => {
     if (!Array.isArray(headers)) return [];
@@ -54,7 +54,21 @@ export function useComparisonConfig(baseFile, targetFiles) {
                     }
                     baseFile.headers.forEach(bCol => {
                         if (newMap[tf.id][bCol] === undefined) {
-                            newMap[tf.id][bCol] = tf.headers.includes(bCol) ? bCol : '';
+                            const bNorm = normalizeHeader(bCol);
+                            let match = tf.headers.find(h => normalizeHeader(h) === bNorm);
+                            if (!match) {
+                                let bestMatch = null;
+                                let bestScore = 0;
+                                tf.headers.forEach(h => {
+                                    const score = stringSimilarity(normalizeHeader(h), bNorm);
+                                    if (score >= 0.80 && score > bestScore) {
+                                        bestScore = score;
+                                        bestMatch = h;
+                                    }
+                                });
+                                if (bestMatch) match = bestMatch;
+                            }
+                            newMap[tf.id][bCol] = match ? match : '';
                             updated = true;
                         }
                     });
@@ -70,7 +84,23 @@ export function useComparisonConfig(baseFile, targetFiles) {
 
     const mappingColsToShow = useMemo(() => baseFile ? baseFile.headers.filter(bCol => {
         if (!showMapped) {
-            const needsMapping = targetFiles.some(tf => !tf.headers.includes(bCol));
+            const needsMapping = targetFiles.some(tf => {
+                const bNorm = normalizeHeader(bCol);
+                let autoMatched = false;
+                if (tf.headers.some(h => normalizeHeader(h) === bNorm)) {
+                    autoMatched = true;
+                } else {
+                    let bestScore = 0;
+                    tf.headers.forEach(h => {
+                        const score = stringSimilarity(normalizeHeader(h), bNorm);
+                        if (score >= 0.80 && score > bestScore) {
+                            bestScore = score;
+                        }
+                    });
+                    if (bestScore >= 0.80) autoMatched = true;
+                }
+                return !autoMatched;
+            });
             if (!needsMapping) return false;
         }
         const allowedVals = mappingFilters['base'];

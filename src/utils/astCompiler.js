@@ -257,63 +257,63 @@ export const evaluateFormula = (expr, variablesObj, enableLog = false) => {
                 }
                 return sVal;
             }
-        if (node.type === 'UNARY') {
-            const e = Number(evalNode(node.expr));
-            return node.op === '-' ? -e : e;
-        }
-        if (node.type === 'BINARY') {
-            const l = evalNode(node.left);
-            const r = evalNode(node.right);
-            switch(node.op.toLowerCase()) {
-                case '+': return Number(l) + Number(r);
-                case '-': return Number(l) - Number(r);
-                case '*': return Number(l) * Number(r);
-                case '/': return Number(l) / Number(r);
-                case '%': return Number(l) % Number(r);
-                case '=': return l == r; 
-                case '<>':
-                case '!=': return l != r;
-                case '>': return Number(l) > Number(r);
-                case '<': return Number(l) < Number(r);
-                case '>=': return Number(l) >= Number(r);
-                case '<=': return Number(l) <= Number(r);
-                case 'and': return l && r;
-                case 'or': return l || r;
-                default: return null;
+            if (node.type === 'UNARY') {
+                const e = Number(evalNode(node.expr));
+                return node.op === '-' ? -e : e;
             }
-        }
-        if (node.type === 'BETWEEN') {
-            const l = Number(evalNode(node.left));
-            const min = Number(evalNode(node.min));
-            const max = Number(evalNode(node.max));
-            return l >= min && l <= max;
-        }
-        if (node.type === 'IN') {
-            const l = String(evalNode(node.left)).toLowerCase();
-            const vals = node.list.map(n => String(evalNode(n)).toLowerCase());
-            return vals.includes(l);
-        }
-        if (node.type === 'CASE') {
-            for (const c of node.cases) {
-                const condStr = stringifyAST(c.cond);
-                const condRes = evalNode(c.cond);
-                if (condRes) {
-                    log(`If [ ${condStr} ] -> ✅ TRUE`);
-                    const res = evalNode(c.res);
-                    log(`=> CHỌN KẾT QUẢ: ${stringifyAST(c.res)} (Thực tế: ${res})`);
-                    return res;
-                } else {
-                    log(`If [ ${condStr} ] -> ❌ FAIL`);
+            if (node.type === 'BINARY') {
+                const l = evalNode(node.left);
+                const r = evalNode(node.right);
+                switch(node.op.toLowerCase()) {
+                    case '+': return Number(l) + Number(r);
+                    case '-': return Number(l) - Number(r);
+                    case '*': return Number(l) * Number(r);
+                    case '/': return Number(l) / Number(r);
+                    case '%': return Number(l) % Number(r);
+                    case '=': return l == r;
+                    case '<>':
+                    case '!=': return l != r;
+                    case '>': return Number(l) > Number(r);
+                    case '<': return Number(l) < Number(r);
+                    case '>=': return Number(l) >= Number(r);
+                    case '<=': return Number(l) <= Number(r);
+                    case 'and': return l && r;
+                    case 'or': return l || r;
+                    default: return null;
                 }
             }
-            if (node.elseExpr) {
-                log(`=> RỚT VÀO ELSE`);
-                const res = evalNode(node.elseExpr);
-                log(`=> CHỌN KẾT QUẢ ELSE: ${stringifyAST(node.elseExpr)} (Thực tế: ${res})`);
-                return res;
+            if (node.type === 'BETWEEN') {
+                const l = Number(evalNode(node.left));
+                const min = Number(evalNode(node.min));
+                const max = Number(evalNode(node.max));
+                return l >= min && l <= max;
             }
-            return null;
-        }
+            if (node.type === 'IN') {
+                const l = String(evalNode(node.left)).toLowerCase();
+                const vals = node.list.map(n => String(evalNode(n)).toLowerCase());
+                return vals.includes(l);
+            }
+            if (node.type === 'CASE') {
+                for (const c of node.cases) {
+                    const condStr = stringifyAST(c.cond);
+                    const condRes = evalNode(c.cond);
+                    if (condRes) {
+                        log(`If [ ${condStr} ] -> ✅ TRUE`);
+                        const res = evalNode(c.res);
+                        log(`=> CHỌN KẾT QUẢ: ${stringifyAST(c.res)} (Thực tế: ${res})`);
+                        return res;
+                    } else {
+                        log(`If [ ${condStr} ] -> ❌ FAIL`);
+                    }
+                }
+                if (node.elseExpr) {
+                    log(`=> RỚT VÀO ELSE`);
+                    const res = evalNode(node.elseExpr);
+                    log(`=> CHỌN KẾT QUẢ ELSE: ${stringifyAST(node.elseExpr)} (Thực tế: ${res})`);
+                    return res;
+                }
+                return null;
+            }
         };
 
     const rawResult = evalNode(ast);

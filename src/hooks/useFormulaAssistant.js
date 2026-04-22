@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { extractVariables, evaluateFormula } from '../utils/astCompiler';
+import { normalizeHeader } from '../utils/excelUtils';
 
 export function useFormulaAssistant(baseFile, targetFiles, keyCol, results, setToastMessage, customFormulas, setCustomFormulas) {
     const [formulaTab, setFormulaTab] = useState('define'); // 'define' or 'sandbox'
@@ -93,7 +94,9 @@ export function useFormulaAssistant(baseFile, targetFiles, keyCol, results, setT
         e.target.value = null; 
     };
 
-    const parseNumSafe = (val) => {
+    // Hàm parse dành riêng cho Sandbox: giữ nguyên chuỗi text thay vì trả null
+    // (Khác với parseNumSafe trong formatters.js dành cho so sánh số)
+    const parseValForSandbox = (val) => {
         if (val === undefined || val === null) return val;
         let sVal = String(val).trim();
         let cleanNum = sVal.replace(/[\(\)\-]/g, '');
@@ -104,15 +107,15 @@ export function useFormulaAssistant(baseFile, targetFiles, keyCol, results, setT
         } else if (commaCount > 1) { cleanNum = cleanNum.replace(/,/g, ''); }
         else if (commaCount === 1) { cleanNum = cleanNum.replace(',', '.'); }
         else if (dotCount > 1) { cleanNum = cleanNum.replace(/\./g, ''); }
-        
+
         if (sVal === '') return '';
         if (/[a-zA-Z]/.test(sVal) || (sVal.startsWith('0') && sVal.length > 1 && !sVal.includes('.'))) {
-            return sVal; 
+            return sVal;
         } else if (!isNaN(cleanNum.replace(/\s+/g, ''))) {
-            let isNegative = sVal.startsWith('-') || (sVal.startsWith('(') && sVal.endsWith(')'));
+            const isNegative = sVal.startsWith('-') || (sVal.startsWith('(') && sVal.endsWith(')'));
             return isNegative ? -parseFloat(cleanNum.replace(/\s+/g, '')) : parseFloat(cleanNum.replace(/\s+/g, ''));
         }
-        return sVal;    
+        return sVal;
     };
 
     const handleTestFormulaLoad = () => {
@@ -127,11 +130,11 @@ export function useFormulaAssistant(baseFile, targetFiles, keyCol, results, setT
             setTestEmpFound(true);
             const formulaObj = customFormulas[testFormulaIdx];
             
-            const actualTargetCol = Object.keys(empRow.baseVals).find(k => k.toLowerCase() === formulaObj.targetCol.toLowerCase()) || formulaObj.targetCol;
+            const actualTargetCol = Object.keys(empRow.baseVals).find(k => normalizeHeader(k) === normalizeHeader(formulaObj.targetCol)) || formulaObj.targetCol;
             const rawTarget = empRow.baseVals[actualTargetCol];
             
             if (rawTarget !== undefined) {
-                setTestTargetVal(parseNumSafe(rawTarget));
+                setTestTargetVal(parseValForSandbox(rawTarget));
             } else {
                 setTestTargetVal("Không tìm thấy trong File Gốc");
             }
@@ -142,11 +145,11 @@ export function useFormulaAssistant(baseFile, targetFiles, keyCol, results, setT
             const varsList = extractVariables(formulaObj.expression);
             
             varsList.forEach(colName => {
-                const actualBaseCol = Object.keys(empRow.baseVals).find(k => k.toLowerCase() === colName.toLowerCase()) || colName;
+                const actualBaseCol = Object.keys(empRow.baseVals).find(k => normalizeHeader(k) === normalizeHeader(colName)) || colName;
                 
                 let val = ""; 
                 if (targetFileId && empRow.targetVals[targetFileId]) {
-                    const actualTargetColTf = Object.keys(empRow.targetVals[targetFileId]).find(k => k.toLowerCase() === colName.toLowerCase()) || colName;
+                    const actualTargetColTf = Object.keys(empRow.targetVals[targetFileId]).find(k => normalizeHeader(k) === normalizeHeader(colName)) || colName;
                     if (empRow.targetVals[targetFileId][actualTargetColTf] !== undefined && empRow.targetVals[targetFileId][actualTargetColTf] !== ' Bỏ qua/Thiếu') {
                         val = empRow.targetVals[targetFileId][actualTargetColTf];
                     } else if (empRow.baseVals[actualBaseCol] !== undefined) {

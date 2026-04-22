@@ -9,7 +9,15 @@ const ExcelColumnFilter = ({ title, uniqueValues, activeFilters, onApplyFilter, 
 
   useEffect(() => {
     if (isOpen) {
-      setSelected(activeFilters || uniqueValues);
+      // Khởi tạo selection dựa trên activeFilters hiện tại,
+      // nhưng chỉ giữ những giá trị CÒN TỒN TẠI trong danh sách uniqueValues theo ngữ cảnh hiện tại.
+      // Nếu chưa có filter nào → mặc định chọn tất cả.
+      if (activeFilters && activeFilters.length > 0) {
+        const validSelected = activeFilters.filter(v => uniqueValues.includes(v));
+        setSelected(validSelected.length > 0 ? validSelected : [...uniqueValues]);
+      } else {
+        setSelected([...uniqueValues]);
+      }
       setSearch('');
       const rect = wrapperRef.current.getBoundingClientRect();
       const menuHeight = 280; 
@@ -57,7 +65,9 @@ const ExcelColumnFilter = ({ title, uniqueValues, activeFilters, onApplyFilter, 
   };
 
   const handleApply = () => {
-    if (selected.length === uniqueValues.length) onApplyFilter(null);
+    // Nếu người dùng chọn hết toàn bộ uniqueValues theo ngữ cảnh hiện tại → bỏ filter (null)
+    const allContextSelected = uniqueValues.every(v => selected.includes(v));
+    if (allContextSelected) onApplyFilter(null);
     else onApplyFilter(selected);
     setIsOpen(false);
   };
@@ -74,7 +84,7 @@ const ExcelColumnFilter = ({ title, uniqueValues, activeFilters, onApplyFilter, 
   };
 
   return (
-    <div className="relative inline-block w-full h-full" ref={wrapperRef}>
+    <div className="relative block w-full h-full" ref={wrapperRef}>
       <div 
         className={`flex items-start justify-between cursor-pointer group px-3 py-2.5 h-full w-full transition-colors ${hasFilter ? 'bg-[#107c41]/20' : isDarkMode ? 'hover:bg-slate-700/50' : 'hover:bg-gray-200/50'}`} 
         onClick={() => setIsOpen(!isOpen)}

@@ -184,12 +184,60 @@ export function useComparisonResults(
     }, [results, globalFilter, globalSearchText, excelFilters, targetFiles, activeValCols, keyCol]); // Added keyCol as dependency for rowMatchesCurrentView
 
     const getUniqueValues = (cKey) => {
-        if (uniqueValuesCache[cKey]) return uniqueValuesCache[cKey];
         if (!results) return [];
-        
-        // Fallback nếu cache chưa kịp nạp (hiếm khi xảy ra)
+
+        // Lấy các giá trị duy nhất từ filteredResults HIỆN TẠI,
+        // nhưng bỏ qua filter của chính cột đang được mở (để vẫn thấy đủ lựa chọn).
+        const filterSetsWithoutSelf = {};
+        for (const [k, allowedVals] of Object.entries(excelFilters)) {
+            if (k !== cKey && allowedVals && allowedVals.length > 0) {
+                filterSetsWithoutSelf[k] = new Set(allowedVals);
+            }
+        }
+
+        const rowsInScope = results.filter(row => {
+            // Global filter
+            if (globalFilter === 'missing' && !row.isMissing) return false;
+            let hasVisibleDiff = false;
+            if (!row.isMissing) {
+                for (const col of activeValCols) {
+                    if (targetFiles.some(tf => row.diffCells[`${col}_${tf.id}`])) {
+                        hasVisibleDiff = true; break;
+                    }
+                }
+            }
+            if (globalFilter === 'diff' && (row.isMissing || !hasVisibleDiff)) return false;
+            if (globalFilter === 'match' && (row.isMissing || hasVisibleDiff)) return false;
+
+            // Global search
+            if (globalSearchText) {
+                if (!JSON.stringify(row).toLowerCase().includes(globalSearchText.toLowerCase())) return false;
+            }
+
+            // Other column filters (skip self)
+            for (const k in filterSetsWithoutSelf) {
+                const allowedSet = filterSetsWithoutSelf[k];
+                let rowVals = [];
+                if (k === `V_${keyCol}`) {
+                    rowVals = [String(row[keyCol])];
+                } else if (k === 'V_status') {
+                    rowVals = row.status.map(s => String(s));
+                } else {
+                    const actualCol = k.substring(2);
+                    const bVal = row.baseVals[actualCol];
+                    if (bVal !== undefined) rowVals.push(String(bVal));
+                    targetFiles.forEach(tf => {
+                        const tVal = row.targetVals[tf.id]?.[actualCol];
+                        if (tVal !== undefined && tVal !== ' Bỏ qua/Thiếu') rowVals.push(String(tVal));
+                    });
+                }
+                if (!rowVals.some(v => allowedSet.has(String(v)))) return false;
+            }
+            return true;
+        });
+
         const vals = new Set();
-        results.forEach(r => {
+        rowsInScope.forEach(r => {
             if (cKey === `V_${keyCol}`) {
                 vals.add(String(r[keyCol]));
             } else if (cKey === 'V_status') {
@@ -230,7 +278,7 @@ export function useComparisonResults(
                 else dynamicMatchCount++;
             });
         }
-        return results ? { total: results.length, match: dynamicDiffCount, diff: dynamicDiffCount, missing: missingCount } : { total: 0, match: 0, diff: 0, missing: 0 };
+        return results ? { total: results.length, match: dynamicMatchCount, diff: dynamicDiffCount, missing: missingCount } : { total: 0, match: 0, diff: 0, missing: 0 };
     }, [results, activeValCols, targetFiles]);
 
     const displayedValCols = useMemo(() => valCols.filter(c => c.toLowerCase().includes(colDisplaySearch.toLowerCase())), [valCols, colDisplaySearch]);
@@ -429,16 +477,37 @@ export function useComparisonResults(
         const str = String(text);
         if (str.trim() === '') return;
 
-        const textArea = document.createElement("textarea");
-        textArea.value = str;
-        document.body.appendChild(textArea);
-        textArea.select();
+        let fallbackSuccess = false;
         try {
-            document.execCommand('copy');
-            setToastMessage(`Đã copy: ${str}`);
-            // setTimeout(() => setToastMessage(''), 2000); // setToastMessage is handled by App.jsx
-        } catch (err) { console.error('Copy failed', err); }
-        document.body.removeChild(textArea);
+            const textArea = document.createElement("textarea");
+            textArea.value = str;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-999999px";
+            textArea.style.top = "-999999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            fallbackSuccess = document.execCommand('copy');
+            document.body.removeChild(textArea);
+        } catch (e) {
+            console.error('Fallback copy failed', e);
+        }
+
+        if (navigator.clipboard && window.isSecureContext) {
+            try {
+                navigator.clipboard.writeText(str)
+                    .then(() => setToastMessage(`Đã copy: ${str}`))
+                    .catch(err => {
+                        console.error('Clipboard API failed', err);
+                        if (fallbackSuccess) setToastMessage(`Đã copy: ${str}`);
+                    });
+            } catch (syncErr) {
+                console.error('Clipboard API sync error', syncErr);
+                if (fallbackSuccess) setToastMessage(`Đã copy: ${str}`);
+            }
+        } else {
+            if (fallbackSuccess) setToastMessage(`Đã copy: ${str}`);
+        }
     };
 
     const renderStackedCell = (row, colKey) => {
@@ -506,8 +575,20 @@ export function useComparisonResults(
                 zIndex: 999999,
             });
         }
-        setShowColMenu(!showColMenu);
+        setShowColMenu(prev => !prev);
     };
+
+    // Đóng dropdown "Cột hiển thị" khi click ra ngoài
+    useEffect(() => {
+        if (!showColMenu) return;
+        const handleClickOutside = (e) => {
+            if (colMenuRef.current && !colMenuRef.current.contains(e.target)) {
+                setShowColMenu(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showColMenu]);
 
     return {
         isProcessing,
@@ -553,5 +634,6 @@ export function useComparisonResults(
         displayedValCols,
         isAllValDisplayed,
         diffNavTracker,
+        handleCopy,
     };
 }

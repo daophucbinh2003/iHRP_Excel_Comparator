@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import { parseNumSafe } from './formatters';
 import { extractVariables } from './astCompiler';
-
+import { normalizeHeader } from './excelUtils';
 // TỐI ƯU HÓA: Chuyển các hàm xử lý ra ngoài để tránh khởi tạo lại trong vòng lặp
 const normalize = (v) => {
     if (v === null || v === undefined) return '0';
@@ -73,11 +73,16 @@ const extractMappedData = (workbook, sheetName, baseColsToExtract, baseKeyColumn
     const sheet = workbook.Sheets[sheetName];
     if (!sheet || !sheet['!ref']) return [];
 
+    const range = XLSX.utils.decode_range(sheet['!ref']);
+    const startRow = range.s.r;
+    
     // Sử dụng sheet_to_json với header: 1 để lấy mảng 2 chiều nhanh nhất
     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-    if (rows.length <= headerRowIdx) return [];
+    
+    const relativeHeaderIdx = headerRowIdx - startRow;
+    if (relativeHeaderIdx < 0 || relativeHeaderIdx >= rows.length) return [];
 
-    const headerRow = rows[headerRowIdx];
+    const headerRow = rows[relativeHeaderIdx];
     const colIndices = [];
     const targetToBase = {};
 
@@ -87,22 +92,32 @@ const extractMappedData = (workbook, sheetName, baseColsToExtract, baseKeyColumn
         if (mapping[baseCol]) targetToBase[mapping[baseCol]] = baseCol;
     });
 
+    const seen = {};
     headerRow.forEach((cellVal, idx) => {
-        const text = String(cellVal || '').trim();
+        let text = cellVal !== undefined && cellVal !== null ? String(cellVal).trim() : '';
+        if (text !== '') {
+            if (seen[text]) {
+                seen[text]++;
+                text = `${text} (${seen[text]})`;
+            } else {
+                seen[text] = 1;
+            }
+        }
         if (targetToBase[text]) {
             colIndices.push({ idx, baseCol: targetToBase[text] });
         }
     });
 
     const data = [];
-    for (let i = headerRowIdx + 1; i < rows.length; i++) {
+    for (let i = relativeHeaderIdx + 1; i < rows.length; i++) {
         const row = rows[i];
         const rowObj = {};
         let hasKey = false;
         let keyValue = "";
 
         colIndices.forEach(({ idx, baseCol }) => {
-            const val = String(row[idx] || '').trim();
+            const rawVal = row[idx];
+            const val = rawVal !== undefined && rawVal !== null ? String(rawVal).trim() : '';
             if (baseCol === baseKeyColumn && val !== "") {
                 const keyLower = val.toLowerCase();
                 // Loại bỏ các dòng rác (tài liệu, STT, cộng tổng...)
@@ -130,12 +145,12 @@ self.onmessage = (e) => {
         const formulaColsNeeded = new Set();
         customFormulas.forEach(f => {
             if (f.targetCol) {
-                const actual = baseFile.headers.find(h => h.toLowerCase() === f.targetCol.toLowerCase()) || f.targetCol;
+                const actual = baseFile.headers.find(h => normalizeHeader(h) === normalizeHeader(f.targetCol)) || f.targetCol;
                 formulaColsNeeded.add(actual);
             }
             const varsList = extractVariables(f.expression);
             varsList.forEach(colName => {
-                const actual = baseFile.headers.find(h => h.toLowerCase() === colName.toLowerCase()) || colName;
+                const actual = baseFile.headers.find(h => normalizeHeader(h) === normalizeHeader(colName)) || colName;
                 formulaColsNeeded.add(actual);
             });
         });
@@ -169,6 +184,9 @@ self.onmessage = (e) => {
         });
         const allKeys = Array.from(allKeysSet);
         const totalKeys = allKeys.length;
+
+        // TỐI ƯU HÓA: Map tra cứu O(1) thay vì .find() O(n) trong mỗi vòng lặp
+        const targetMapsById = new Map(targetMaps.map(tm => [tm.id, tm]));
 
         // TỐI ƯU HÓA: Bộ đệm Unique Values
         const uniqueValues = {
@@ -209,7 +227,7 @@ self.onmessage = (e) => {
             }
 
             targetFiles.forEach((tf) => {
-                const tm = targetMaps.find(m => m.id === tf.id);
+                const tm = targetMapsById.get(tf.id);
                 if (!tm.hasKey) {
                     hasDiff = true; isPerfectMatch = false;
                     diffRow.targetVals[tf.id] = { _error: 'Không có Key' };

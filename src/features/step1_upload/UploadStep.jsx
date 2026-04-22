@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { useThemeContext } from '../../context/ThemeContext';
 import { useWorkflow } from '../../context/WorkflowContext';
 import { useComparison } from '../../context/ComparisonContext';
+import { normalizeHeader, stringSimilarity } from '../../utils/excelUtils';
 
 
 // Giả sử bạn sẽ truyền các props này từ App.jsx (hoặc từ Context sau này)
@@ -103,7 +104,12 @@ export function UploadStep() {
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
                             {targetFiles.map((file, idx) => {
-                                const sharedColsCount = baseFile ? file.headers.filter(h => baseFile.headers.includes(h)).length : 0;
+                                const sharedColsCount = baseFile ? file.headers.filter(h => baseFile.headers.some(bh => {
+                                    const hNorm = normalizeHeader(h);
+                                    const bhNorm = normalizeHeader(bh);
+                                    if (hNorm === bhNorm) return true;
+                                    return stringSimilarity(hNorm, bhNorm) >= 0.80;
+                                })).length : 0;
                                 const hasZeroCommon = baseFile && sharedColsCount === 0;
 
                                 return (

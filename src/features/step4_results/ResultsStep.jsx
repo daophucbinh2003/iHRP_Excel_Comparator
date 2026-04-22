@@ -128,8 +128,8 @@ export function ResultsStep() {
                     <table className="w-full text-left border-collapse">
                       <thead className={`${themeUI.tableHead} sticky top-0 z-30 shadow-md`}>
                         <tr>
-                          <th className={`p-0 border-b border-r sticky left-0 z-40 align-top ${themeUI.tableHead} ${themeUI.border}`}>
-                            <div className="resize-x-handle overflow-auto custom-scrollbar-hide min-w-[140px] max-w-[400px] h-full flex flex-col justify-between">
+                          <th className={`p-0 border-b border-r sticky left-0 z-40 align-top ${themeUI.tableHead} ${themeUI.border} resize-x-handle overflow-auto custom-scrollbar-hide min-w-[140px]`}>
+                            <div className="w-full h-full flex flex-col justify-between">
                               <ExcelColumnFilter 
                                   title={keyCol} uniqueValues={getUniqueValues(`V_${keyCol}`)} activeFilters={excelFilters[`V_${keyCol}`]} isDarkMode={isDarkMode}
                                   onApplyFilter={(vals) => setExcelFilters({...excelFilters, [`V_${keyCol}`]: vals})} 
@@ -137,8 +137,8 @@ export function ResultsStep() {
                             </div>
                           </th>
                           {visibleValCols.map(col => (
-                            <th key={`th-v-empty-${col}`} className={`p-0 border-b border-r font-bold align-top ${themeUI.border}`}>
-                              <div className="resize-x-handle overflow-auto custom-scrollbar-hide min-w-[180px] max-w-[500px] h-full flex flex-col justify-between">
+                            <th key={`th-v-empty-${col}`} className={`p-0 border-b border-r font-bold align-top ${themeUI.border} resize-x-handle overflow-auto custom-scrollbar-hide min-w-[180px]`}>
+                              <div className="w-full h-full flex flex-col justify-between">
                                 <ExcelColumnFilter 
                                     title={`[Giá trị] ${col}`} uniqueValues={getUniqueValues(`V_${col}`)} activeFilters={excelFilters[`V_${col}`]} isDarkMode={isDarkMode} badgeCount={getColDiffCount(col)}
                                     onApplyFilter={(vals) => setExcelFilters({...excelFilters, [`V_${col}`]: vals})}
@@ -173,8 +173,8 @@ export function ResultsStep() {
                     <table className="w-full text-left border-collapse">
                       <thead className={`${themeUI.tableHead} sticky top-0 z-30 shadow-md`}>
                         <tr>
-                          <th className={`p-0 border-b border-r sticky left-0 z-40 align-top ${themeUI.tableHead} ${themeUI.border}`}>
-                            <div className="resize-x-handle overflow-auto custom-scrollbar-hide min-w-[140px] max-w-[400px] h-full flex flex-col justify-between">
+                          <th className={`p-0 border-b border-r sticky left-0 z-40 align-top ${themeUI.tableHead} ${themeUI.border} resize-x-handle overflow-auto custom-scrollbar-hide min-w-[140px]`}>
+                            <div className="w-full h-full flex flex-col justify-between">
                               <ExcelColumnFilter 
                                   title={keyCol} uniqueValues={getUniqueValues(`V_${keyCol}`)} activeFilters={excelFilters[`V_${keyCol}`]} isDarkMode={isDarkMode}
                                   onApplyFilter={(vals) => setExcelFilters({...excelFilters, [`V_${keyCol}`]: vals})} 
@@ -183,8 +183,8 @@ export function ResultsStep() {
                           </th>
                           
                           {visibleValCols.map(col => (
-                            <th key={`th-v-${col}`} className={`p-0 border-b border-r font-bold align-top ${themeUI.border}`}>
-                              <div className="resize-x-handle overflow-auto custom-scrollbar-hide min-w-[180px] max-w-[500px] h-full flex flex-col justify-between">
+                            <th key={`th-v-${col}`} className={`p-0 border-b border-r font-bold align-top ${themeUI.border} resize-x-handle overflow-auto custom-scrollbar-hide min-w-[180px]`}>
+                              <div className="w-full h-full flex flex-col justify-between">
                                 <ExcelColumnFilter 
                                     title={`[Giá trị] ${col}`} uniqueValues={getUniqueValues(`V_${col}`)} activeFilters={excelFilters[`V_${col}`]} isDarkMode={isDarkMode} badgeCount={getColDiffCount(col)}
                                     onApplyFilter={(vals) => setExcelFilters({...excelFilters, [`V_${col}`]: vals})}
