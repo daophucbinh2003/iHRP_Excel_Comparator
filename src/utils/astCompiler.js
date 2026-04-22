@@ -49,6 +49,7 @@ export const tokenizeSQL = (code) => {
             continue;
         }
 
+        if (char === '=' && code[i+1] === '=') { tokens.push({ type: 'OP', value: '==' }); i+=2; continue; }
         if (char === '<' && code[i+1] === '>') { tokens.push({ type: 'OP', value: '<>' }); i+=2; continue; }
         if (char === '!' && code[i+1] === '=') { tokens.push({ type: 'OP', value: '!=' }); i+=2; continue; }
         if (char === '<' && code[i+1] === '=') { tokens.push({ type: 'OP', value: '<=' }); i+=2; continue; }
@@ -185,7 +186,7 @@ export const evaluateFormula = (expr, variablesObj, enableLog = false) => {
                     else if (t.value === 'in') opPrec = 4;
                     else if (t.value === 'between') opPrec = 4;
                 } else if (t.type === 'OP') {
-                    if (['=', '<>', '!=', '>', '<', '>=', '<='].includes(t.value)) opPrec = 3;
+                    if (['=', '==', '<>', '!=', '>', '<', '>=', '<='].includes(t.value)) opPrec = 3;
                     else if (['+', '-'].includes(t.value)) opPrec = 5;
                     else if (['*', '/', '%'].includes(t.value)) opPrec = 6;
                 }
@@ -285,7 +286,8 @@ export const evaluateFormula = (expr, variablesObj, enableLog = false) => {
                     case '*': return Number(l) * Number(r);
                     case '/': return Number(l) / Number(r);
                     case '%': return Number(l) % Number(r);
-                    case '=': return l == r;
+                    case '=': 
+                    case '==': return l == r;
                     case '<>':
                     case '!=': return l != r;
                     case '>': return Number(l) > Number(r);
@@ -309,20 +311,31 @@ export const evaluateFormula = (expr, variablesObj, enableLog = false) => {
                 return vals.includes(l);
             }
             if (node.type === 'CALL') {
-                const evaluatedArgs = node.args.map(evalNode);
                 if (node.name === 'round') {
+                    const evaluatedArgs = node.args.map(evalNode);
                     const val = Number(evaluatedArgs[0]);
                     const precision = evaluatedArgs[1] !== undefined ? Number(evaluatedArgs[1]) : 0;
                     const factor = Math.pow(10, precision);
-                    return Math.round(val * factor) / factor;
+                    const res = Math.round(val * factor) / factor;
+                    log(`ROUND(${val}, ${precision}) => ${res}`);
+                    return res;
                 }
                 if (node.name === 'if') {
-                    const cond = evaluatedArgs[0];
-                    const trueRes = evaluatedArgs[1];
-                    const falseRes = evaluatedArgs[2];
-                    return cond ? trueRes : falseRes;
+                    const cond = evalNode(node.args[0]);
+                    const condStr = stringifyAST(node.args[0]);
+                    if (cond) {
+                        const trueRes = evalNode(node.args[1]);
+                        log(`IF [ ${condStr} ] => ✅ PASS (TRUE)`);
+                        log(`=> CHỌN KẾT QUẢ: ${stringifyAST(node.args[1])} (Thực tế: ${trueRes})`);
+                        return trueRes;
+                    } else {
+                        const falseRes = evalNode(node.args[2]);
+                        log(`IF [ ${condStr} ] => ❌ FAIL (FALSE)`);
+                        log(`=> CHỌN KẾT QUẢ: ${stringifyAST(node.args[2])} (Thực tế: ${falseRes})`);
+                        return falseRes;
+                    }
                 }
-                if (node.name === 'abs') return Math.abs(Number(evaluatedArgs[0]));
+                if (node.name === 'abs') return Math.abs(Number(evalNode(node.args[0])));
                 return null;
             }
             if (node.type === 'CASE') {
@@ -330,12 +343,12 @@ export const evaluateFormula = (expr, variablesObj, enableLog = false) => {
                     const condStr = stringifyAST(c.cond);
                     const condRes = evalNode(c.cond);
                     if (condRes) {
-                        log(`If [ ${condStr} ] -> ✅ TRUE`);
+                        log(`CASE WHEN [ ${condStr} ] => ✅ PASS`);
                         const res = evalNode(c.res);
                         log(`=> CHỌN KẾT QUẢ: ${stringifyAST(c.res)} (Thực tế: ${res})`);
                         return res;
                     } else {
-                        log(`If [ ${condStr} ] -> ❌ FAIL`);
+                        log(`CASE WHEN [ ${condStr} ] => ❌ FAIL`);
                     }
                 }
                 if (node.elseExpr) {
@@ -348,16 +361,20 @@ export const evaluateFormula = (expr, variablesObj, enableLog = false) => {
             }
         };
 
-    const rawResult = evalNode(ast);
-    
-    if (typeof rawResult === 'string') return { result: rawResult, logs };
-    if (rawResult === null || isNaN(rawResult) || !isFinite(rawResult)) {
-        return { result: 'Lỗi tính toán / Dữ liệu rỗng', logs };
-    }
-    
-    return { result: parseFloat(rawResult.toFixed(4)), logs };
+        const rawResult = evalNode(ast);
+        
+        if (typeof rawResult === 'string') return { result: rawResult, logs };
+        if (typeof rawResult === 'boolean') return { result: rawResult ? 'TRUE' : 'FALSE', logs };
+        if (rawResult === null || rawResult === undefined || isNaN(rawResult) || !isFinite(rawResult)) {
+            const errorMsg = `[ERROR] Kết quả không hợp lệ: ${rawResult}`;
+            log(errorMsg);
+            return { result: 'Lỗi tính toán', logs };
+        }
+        
+        return { result: parseFloat(rawResult.toFixed(4)), logs };
     } catch (e) {
-        log(`[FATAL ERROR] AST Compiler bắt được lỗi: \n${e.message}`);
-        return { result: 'Sai cú pháp', logs };
+        const fatalMsg = `[FATAL ERROR] ${e.message}`;
+        log(fatalMsg);
+        return { result: 'Lỗi hệ thống', logs };
     }
 };

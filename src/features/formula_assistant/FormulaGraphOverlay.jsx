@@ -278,6 +278,31 @@ export const FormulaGraphOverlay = () => {
                 });
             }
 
+            // Helper to draw arrows
+            const drawArrow = (ctx, fromX, fromY, toX, toY, color, width, isDimmed) => {
+                const headLength = 10;
+                const angle = Math.atan2(toY - fromY, toX - fromX);
+                
+                ctx.beginPath();
+                ctx.globalAlpha = isDimmed ? 0.08 : 1;
+                ctx.strokeStyle = color;
+                ctx.lineWidth = width;
+                
+                // Draw line
+                ctx.moveTo(fromX, fromY);
+                ctx.lineTo(toX, toY);
+                ctx.stroke();
+                
+                // Draw arrowhead
+                ctx.beginPath();
+                ctx.moveTo(toX, toY);
+                ctx.lineTo(toX - headLength * Math.cos(angle - Math.PI / 6), toY - headLength * Math.sin(angle - Math.PI / 6));
+                ctx.moveTo(toX, toY);
+                ctx.lineTo(toX - headLength * Math.cos(angle + Math.PI / 6), toY - headLength * Math.sin(angle + Math.PI / 6));
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            };
+
             // Links
             graphData.links.forEach(l => {
                 const s = graphData.nodes.find(n => n.id === l.source);
@@ -286,21 +311,25 @@ export const FormulaGraphOverlay = () => {
                     const isLinkHighlighted = highlightedLinks.has(`${l.source}-${l.target}`);
                     const isDimmed = activeNodeId && !isLinkHighlighted;
                     
-                    ctx.beginPath();
-                    ctx.globalAlpha = isDimmed ? 0.08 : 1; // Làm mờ sâu hơn nữa (8%)
-                    
+                    let color = isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)';
+                    let width = 1;
+
                     if (isLinkHighlighted) {
-                        ctx.strokeStyle = isDarkMode ? '#fff' : '#0f172a';
-                        ctx.lineWidth = 3;
-                    } else {
-                        ctx.strokeStyle = isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)';
-                        ctx.lineWidth = 1;
+                        color = isDarkMode ? '#fff' : '#0f172a';
+                        width = 3;
                     }
                     
-                    ctx.moveTo(s.x, s.y);
-                    ctx.lineTo(t.x, t.y);
-                    ctx.stroke();
-                    ctx.globalAlpha = 1; // Khôi phục alpha
+                    // Draw from Source to Target (Dependency direction)
+                    // We need to calculate the point on the node's edge to stop the arrow
+                    const dx = t.x - s.x;
+                    const dy = t.y - s.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const targetRadius = (t.id === graphViewFormula?.targetCol) ? 25 : 15;
+                    
+                    const edgeX = t.x - (dx / dist) * targetRadius;
+                    const edgeY = t.y - (dy / dist) * targetRadius;
+
+                    drawArrow(ctx, s.x, s.y, edgeX, edgeY, color, width, isDimmed);
                 }
             });
 
@@ -311,36 +340,62 @@ export const FormulaGraphOverlay = () => {
                 const isRoot = n.id === graphViewFormula?.targetCol;
                 
                 const isDimmed = activeNodeId && !isHighlightDependency;
-                ctx.globalAlpha = isDimmed ? 0.12 : 1; // Làm mờ sâu để highlight nổi bật
+                ctx.globalAlpha = isDimmed ? 0.12 : 1; 
 
-                ctx.shadowBlur = (isSelected || isHighlightDependency || isRoot) ? (isRoot ? 25 : 15) : 5;
-                if (isRoot) ctx.shadowColor = 'rgba(234,179,8,0.7)'; // Vàng
-                else if (n.type === 'error') ctx.shadowColor = 'rgba(239,68,68,0.6)'; // Đỏ
-                else if (n.type === 'formula') ctx.shadowColor = 'rgba(99,102,241,0.4)';
-                else ctx.shadowColor = 'rgba(16,185,129,0.4)';
+                // Enhanced Node Background (Shadow + Glow)
+                ctx.shadowBlur = (isSelected || isHighlightDependency || isRoot) ? (isRoot ? 35 : 20) : 8;
+                if (isRoot) ctx.shadowColor = 'rgba(234,179,8,0.8)'; 
+                else if (n.type === 'error') ctx.shadowColor = 'rgba(239,68,68,0.6)'; 
+                else if (n.type === 'formula') ctx.shadowColor = 'rgba(99,102,241,0.5)';
+                else ctx.shadowColor = 'rgba(16,185,129,0.5)';
                 
+                // Draw Node Shape (Rounded Box for better text visibility if needed, but keeping circle for consistency)
+                const radius = isRoot ? 25 : 15;
                 ctx.beginPath();
-                ctx.arc(n.x, n.y, isRoot ? 22 : 12, 0, Math.PI * 2);
+                ctx.arc(n.x, n.y, radius, 0, Math.PI * 2);
                 
-                if (isRoot) ctx.fillStyle = '#eab308';
-                else if (n.type === 'error') ctx.fillStyle = '#ef4444';
-                else if (n.type === 'formula') ctx.fillStyle = '#6366f1';
-                else ctx.fillStyle = '#10b981';
+                // Gradient Fill
+                const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, radius);
+                if (isRoot) {
+                    grad.addColorStop(0, '#fde047');
+                    grad.addColorStop(1, '#eab308');
+                } else if (n.type === 'error') {
+                    grad.addColorStop(0, '#f87171');
+                    grad.addColorStop(1, '#ef4444');
+                } else if (n.type === 'formula') {
+                    grad.addColorStop(0, '#818cf8');
+                    grad.addColorStop(1, '#6366f1');
+                } else {
+                    grad.addColorStop(0, '#34d399');
+                    grad.addColorStop(1, '#10b981');
+                }
+                
+                ctx.fillStyle = grad;
                 ctx.fill();
 
-                if (isSelected || isRoot || isHighlightDependency) {
-                    ctx.strokeStyle = '#fff';
-                    ctx.lineWidth = 3;
-                    ctx.stroke();
-                }
+                // Node Border
+                ctx.strokeStyle = isDarkMode ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.8)';
+                ctx.lineWidth = isSelected ? 4 : 2;
+                ctx.stroke();
 
+                // Labels
                 ctx.shadowBlur = 0;
-                ctx.fillStyle = n.type === 'error' ? '#ef4444' : (isRoot ? '#fde047' : (isDarkMode ? '#cbd5e1' : '#475569'));
-                ctx.font = `${isSelected || isRoot || isHighlightDependency || n.type === 'error' ? 'bold' : 'normal'} ${isRoot ? '14px' : '12px'} Inter`;
-                ctx.textAlign = 'center';
-                ctx.fillText(n.label, n.x, n.y + (isRoot ? 40 : 30));
                 
-                ctx.globalAlpha = 1; // Khôi phục alpha
+                // Label Background for better readability
+                const labelText = n.label;
+                ctx.font = `${isSelected || isRoot || isHighlightDependency || n.type === 'error' ? 'bold' : '500'} ${isRoot ? '14px' : '12px'} Inter`;
+                const textWidth = ctx.measureText(labelText).width;
+                
+                ctx.fillStyle = isDarkMode ? 'rgba(15,23,42,0.8)' : 'rgba(255,255,255,0.8)';
+                ctx.fillRect(n.x - (textWidth/2) - 6, n.y + (isRoot ? 35 : 25), textWidth + 12, 18);
+                ctx.strokeStyle = isRoot ? '#eab308' : (isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)');
+                ctx.strokeRect(n.x - (textWidth/2) - 6, n.y + (isRoot ? 35 : 25), textWidth + 12, 18);
+
+                ctx.fillStyle = n.type === 'error' ? '#ef4444' : (isRoot ? (isDarkMode ? '#fff' : '#854d0e') : (isDarkMode ? '#fff' : '#1e293b'));
+                ctx.textAlign = 'center';
+                ctx.fillText(labelText, n.x, n.y + (isRoot ? 48 : 38));
+                
+                ctx.globalAlpha = 1; 
             });
 
             ctx.restore();

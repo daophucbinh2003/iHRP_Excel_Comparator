@@ -9,6 +9,9 @@ export function useFormulaAssistant(baseFile, targetFiles, keyCol, results, setT
     const [previewVariables, setPreviewVariables] = useState([]);
     const [hasPreviewed, setHasPreviewed] = useState(false);
     const [editingFormulaIdx, setEditingFormulaIdx] = useState(-1);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [importFiles, setImportFiles] = useState([]);
+    const [formulaSearch, setFormulaSearch] = useState('');
 
     const importFormulaRef = useRef(null);
 
@@ -37,61 +40,91 @@ export function useFormulaAssistant(baseFile, targetFiles, keyCol, results, setT
     };
 
     const handleImportFormulas = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        try {
-            const data = await file.arrayBuffer();
-            const wb = window.XLSX.read(data, { type: 'array' });
-            const wsName = wb.SheetNames[0];
-            const ws = wb.Sheets[wsName];
-            const jsonData = window.XLSX.utils.sheet_to_json(ws, { header: 1 });
-            
-            if (jsonData.length < 2) {
-                alert("File quá ngắn hoặc trống."); return;
-            }
-            
-            const headerRow = jsonData[0] || [];
-            let targetIdx = -1;
-            let exprIdx = -1;
-
-            headerRow.forEach((h, idx) => {
-                const str = String(h).toLowerCase().trim();
-                if (str.includes('mã tiêu chí') || str.includes('cột đích') || str === 'target') targetIdx = idx;
-                if (str.includes('công thức') || str === 'formula') exprIdx = idx;
-            });
-
-            if (targetIdx === -1 || exprIdx === -1) {
-                alert("Không tìm thấy cột 'Mã tiêu chí' và 'Công thức' ở dòng đầu tiên của file.");
-                return;
-            }
-
-            const imported = [];
-            for (let i = 1; i < jsonData.length; i++) {
-                const row = jsonData[i];
-                if (row && row[targetIdx] && row[exprIdx]) {
-                    imported.push({ targetCol: String(row[targetIdx]).trim(), expression: String(row[exprIdx]).trim() });
-                }
-            }
-            
-            if (imported.length > 0) {
-                setCustomFormulas(prev => {
-                    const newFormulas = [...prev];
-                    imported.forEach(imp => {
-                        if (!newFormulas.some(f => f.targetCol === imp.targetCol && f.expression === imp.expression)) {
-                            newFormulas.push(imp);
-                        }
-                    });
-                    return newFormulas;
-                });
-                alert(`Đã import thành công ${imported.length} công thức!`);
-            } else {
-                alert("Không tìm thấy dữ liệu công thức hợp lệ trong file.");
-            }
-        } catch (err) {
-            console.error(err);
-            alert("Có lỗi khi đọc file Excel.");
-        }
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+        setImportFiles(prev => [...prev, ...files]);
         e.target.value = null; 
+    };
+
+    const handleExtractFormulas = async () => {
+        if (importFiles.length === 0) {
+            alert("Vui lòng chọn ít nhất một file."); return;
+        }
+
+        let totalImported = 0;
+        let newFormulasCount = 0;
+        let skippedFiles = [];
+
+        for (const file of importFiles) {
+            try {
+                const data = await file.arrayBuffer();
+                const wb = window.XLSX.read(data, { type: 'array' });
+                const wsName = wb.SheetNames[0];
+                const ws = wb.Sheets[wsName];
+                const jsonData = window.XLSX.utils.sheet_to_json(ws, { header: 1 });
+                
+                if (jsonData.length < 2) {
+                    skippedFiles.push(`${file.name} (File trống hoặc ít dữ liệu)`);
+                    continue;
+                }
+                
+                const headerRow = jsonData[0] || [];
+                let targetIdx = -1;
+                let exprIdx = -1;
+
+                headerRow.forEach((h, idx) => {
+                    const str = String(h).toLowerCase().trim();
+                    if (str === 'mã' || str.includes('mã tiêu chí') || str.includes('cột đích') || str === 'target' || str.includes('mã cột')) targetIdx = idx;
+                    if (str.includes('công thức') || str === 'formula' || str.includes('biểu thức') || str === 'expression') exprIdx = idx;
+                });
+
+                if (targetIdx === -1 || exprIdx === -1) {
+                    skippedFiles.push(`${file.name} (Không tìm thấy cột Mã/Công thức)`);
+                    continue;
+                }
+
+                const imported = [];
+                for (let i = 1; i < jsonData.length; i++) {
+                    const row = jsonData[i];
+                    if (row && row[targetIdx] && row[exprIdx]) {
+                        imported.push({ targetCol: String(row[targetIdx]).trim(), expression: String(row[exprIdx]).trim() });
+                    }
+                }
+                
+                if (imported.length > 0) {
+                    setCustomFormulas(prev => {
+                        const newFormulas = [...prev];
+                        let count = 0;
+                        imported.forEach(imp => {
+                            if (!newFormulas.some(f => f.targetCol === imp.targetCol && f.expression === imp.expression)) {
+                                newFormulas.push(imp);
+                                count++;
+                            }
+                        });
+                        newFormulasCount += count;
+                        return newFormulas;
+                    });
+                    totalImported += imported.length;
+                } else {
+                    skippedFiles.push(`${file.name} (Không có dữ liệu hàng)`);
+                }
+            } catch (err) {
+                console.error(`Lỗi khi đọc file ${file.name}:`, err);
+                skippedFiles.push(`${file.name} (Lỗi đọc file)`);
+            }
+        }
+
+        if (totalImported > 0) {
+            let msg = `Đã trích xuất thành công ${totalImported} công thức! (Thêm mới: ${newFormulasCount})`;
+            if (skippedFiles.length > 0) {
+                msg += `\n\nLưu ý các file bị bỏ qua:\n- ${skippedFiles.join('\n- ')}`;
+            }
+            alert(msg);
+            setImportFiles([]);
+            setIsImportModalOpen(false);
+        } else {
+            alert(`Không tìm thấy dữ liệu công thức hợp lệ.\n\nChi tiết:\n- ${skippedFiles.join('\n- ')}`);
+        }
     };
 
     // Hàm parse dành riêng cho Sandbox: giữ nguyên chuỗi text thay vì trả null
@@ -205,6 +238,11 @@ export function useFormulaAssistant(baseFile, targetFiles, keyCol, results, setT
         testTargetVal, setTestTargetVal,
         calcLogs, setCalcLogs,
         
+        isImportModalOpen, setIsImportModalOpen,
+        importFiles, setImportFiles,
+        handleExtractFormulas,
+        formulaSearch, setFormulaSearch,
+
         handleTestFormulaLoad,
         handleCalculateSandboxFormula
     };

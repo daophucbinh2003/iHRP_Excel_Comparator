@@ -4,10 +4,11 @@ import { extractVariables } from '../../utils/astCompiler';
 import { useThemeContext } from '../../context/ThemeContext';
 import { useFormula } from '../../context/FormulaContext';
 import { useWorkflow } from '../../context/WorkflowContext';
+import { FormulaImportModal } from './FormulaImportModal';
 
 export function FormulaAssistant() {
     const { themeUI, isDarkMode } = useThemeContext();
-  const { formulaTab, setFormulaTab, newFormulaTarget, setNewFormulaTarget, newFormulaExpr, setNewFormulaExpr, hasPreviewed, setHasPreviewed, previewVariables, setPreviewVariables, editingFormulaIdx, setEditingFormulaIdx, customFormulas, setCustomFormulas, importFormulaRef, handleImportFormulas, handlePreviewFormula, testEmpId, setTestEmpId, testFormulaIdx, setTestFormulaIdx, isSandboxComboOpen, setIsSandboxComboOpen, sandboxSearch, setSandboxSearch, sandboxComboRef, handleTestFormulaLoad, testEmpFound, setTestEmpFound, testVariables, setTestVariables, showConsole, setShowConsole, handleCalculateSandboxFormula, isCalculated, setIsCalculated, testResult, setTestResult, testTargetVal, setTestTargetVal, calcLogs, setCalcLogs, setGraphViewFormula, setIsGraphOpen, setChainViewFormula, setIsChainOpen } = useFormula();
+  const { formulaTab, setFormulaTab, newFormulaTarget, setNewFormulaTarget, newFormulaExpr, setNewFormulaExpr, hasPreviewed, setHasPreviewed, previewVariables, setPreviewVariables, editingFormulaIdx, setEditingFormulaIdx, customFormulas, setCustomFormulas, importFormulaRef, handleImportFormulas, handlePreviewFormula, testEmpId, setTestEmpId, testFormulaIdx, setTestFormulaIdx, isSandboxComboOpen, setIsSandboxComboOpen, sandboxSearch, setSandboxSearch, sandboxComboRef, handleTestFormulaLoad, testEmpFound, setTestEmpFound, testVariables, setTestVariables, showConsole, setShowConsole, handleCalculateSandboxFormula, isCalculated, setIsCalculated, testResult, setTestResult, testTargetVal, setTestTargetVal, calcLogs, setCalcLogs, setGraphViewFormula, setIsGraphOpen, setChainViewFormula, setIsChainOpen, isImportModalOpen, setIsImportModalOpen, importFiles, setImportFiles, handleExtractFormulas, formulaSearch, setFormulaSearch } = useFormula();
   const { currentStep, setCurrentStep, setPreviousStep } = useWorkflow();
 
     const handleSaveClick = () => {
@@ -92,39 +93,161 @@ export function FormulaAssistant() {
 
             <div className={`overflow-y-auto flex-1 p-6 ${isDarkMode ? 'custom-dark-scrollbar' : 'custom-light-scrollbar'}`}>
                 {formulaTab === 'define' && (
-                    <div className="flex flex-col h-full min-h-[500px]">
-                        <div className="flex flex-col md:flex-row gap-6 flex-1">
-                            <div className="flex-1 flex flex-col gap-4">
-                                <div>
-                                    <label className={`font-bold text-sm mb-2 block ${themeUI.textTitle}`}>Mã tiêu chí (Cột Kết quả)</label>
-                                    <input type="text" className={`w-full p-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold ${themeUI.inputBg}`} value={newFormulaTarget} onChange={(e) => setNewFormulaTarget(e.target.value)} placeholder="VD: Hệ số chức danh..." />
-                                </div>
-                                <div className="flex-1 flex flex-col">
-                                    <label className={`font-bold text-sm mb-2 flex justify-between items-center ${themeUI.textTitle}`}>Công thức tính toán (Sử dụng các cột từ file gốc hoặc file đối sánh)<span className="text-xs font-normal text-indigo-500 bg-indigo-100 dark:bg-indigo-900/40 px-2 py-0.5 rounded">Hỗ trợ: + - * / ( ) % | Tiền tố tự bóc tách: TT_..., TK_...</span></label>
-                                    <textarea className={`w-full p-3 border rounded-lg flex-1 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[120px] font-mono text-sm leading-relaxed ${themeUI.inputBg}`} placeholder="VD: Hệ số nhân viên * TT_He_so_lam_viec" value={newFormulaExpr} onChange={(e) => { setNewFormulaExpr(e.target.value); setHasPreviewed(false); }} />
-                                    <div className="flex items-center gap-3 mt-3">
-                                        <button onClick={handlePreviewFormula} title="Phân tích công thức để tìm các biến số liên quan" className={`py-2.5 font-bold rounded shadow-sm transition-colors text-sm flex-1 flex items-center justify-center gap-2 ${isDarkMode ? 'bg-slate-700 hover:bg-slate-600 text-white border border-slate-600' : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200'}`}>Kiểm tra cấu trúc</button>
-                                        {editingFormulaIdx >= 0 && (<button onClick={handleCancelEditClick} title="Hủy bỏ việc chỉnh sửa và quay lại tạo mới" className={`py-2.5 px-4 font-bold rounded shadow-sm transition-colors text-sm ${isDarkMode ? 'bg-slate-600 hover:bg-slate-500 text-white border border-slate-500' : 'bg-gray-200 hover:bg-gray-300 text-gray-800 border border-gray-300'}`}>Hủy</button>)}
-                                        <button onClick={handleSaveClick} title="Lưu công thức vào danh sách hệ thống" disabled={!newFormulaTarget || !newFormulaExpr.trim()} className={`py-2.5 px-4 rounded font-bold shadow-md transition-colors text-sm flex-1 ${!newFormulaTarget || !newFormulaExpr.trim() ? 'bg-slate-600 text-gray-300 cursor-not-allowed opacity-70' : (editingFormulaIdx >= 0 ? 'bg-green-600 hover:bg-green-500 text-white' : 'bg-indigo-600 hover:bg-indigo-500 text-white')}`}>{editingFormulaIdx >= 0 ? '✓ Cập nhật' : '+ Lưu Công Thức Mới'}</button>
+                    <div className="flex flex-col h-full">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1 min-h-0">
+                            {/* EDITOR SECTION */}
+                            <div className="lg:col-span-8 flex flex-col gap-6">
+                                <div className={`p-6 rounded-2xl border shadow-sm flex-1 flex flex-col ${isDarkMode ? 'bg-slate-800/40 border-slate-700' : 'bg-white border-slate-200'}`}>
+                                    <div className="mb-6 flex justify-between items-center">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
+                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                                            </div>
+                                            <div>
+                                                <h3 className={`font-bold ${themeUI.textTitle}`}>Soạn thảo công thức</h3>
+                                                <p className={`text-[10px] ${themeUI.textMuted}`}>Hỗ trợ SQL, IF/CASE và các toán tử cơ bản</p>
+                                            </div>
+                                        </div>
+                                        {editingFormulaIdx !== -1 && (
+                                            <button onClick={() => setEditingFormulaIdx(-1)} className="text-xs text-red-500 hover:underline flex items-center gap-1">
+                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg> Hủy chỉnh sửa
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    <div className="space-y-5 flex-1 flex flex-col">
+                                        <div>
+                                            <label className={`font-bold text-xs mb-2 block uppercase tracking-widest ${themeUI.textMuted}`}>Mã tiêu chí (Cột Kết quả)</label>
+                                            <input 
+                                                type="text" 
+                                                placeholder="VD: Hệ số chức danh..." 
+                                                value={newFormulaTarget} 
+                                                onChange={(e) => setNewFormulaTarget(e.target.value)} 
+                                                className={`w-full p-3 text-sm font-bold border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all ${themeUI.inputBg} border-slate-200 dark:border-slate-600`} 
+                                            />
+                                        </div>
+
+                                        <div className="flex-1 flex flex-col min-h-[200px]">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <label className={`font-bold text-xs uppercase tracking-widest ${themeUI.textMuted}`}>Công thức tính toán</label>
+                                                <span className="text-[10px] text-indigo-500 font-bold">Hỗ trợ: + - * / ( ) % | CASE WHEN...</span>
+                                            </div>
+                                            <textarea 
+                                                placeholder="VD: Hệ số nhân viên * TT_He_so_lam_viec" 
+                                                value={newFormulaExpr} 
+                                                onChange={(e) => setNewFormulaExpr(e.target.value)} 
+                                                className={`w-full p-4 text-sm font-mono leading-relaxed border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all flex-1 resize-none ${themeUI.inputBg} border-slate-200 dark:border-slate-600 ${isDarkMode ? 'custom-dark-scrollbar' : 'custom-light-scrollbar'}`}
+                                            />
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4 pt-2">
+                                            <button onClick={handlePreviewFormula} className={`py-3 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2 ${isDarkMode ? 'bg-slate-700 hover:bg-slate-600 text-white border border-slate-600' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'}`}>
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                                Kiểm tra cấu trúc
+                                            </button>
+                                            <button onClick={handleSaveClick} className="py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-500/20 transition-all flex items-center justify-center gap-2">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                                                {editingFormulaIdx !== -1 ? 'Cập nhật Công thức' : 'Lưu Công thức Mới'}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            <div className={`w-full md:w-[320px] p-4 border rounded-xl shadow-inner flex flex-col shrink-0 ${isDarkMode ? 'bg-slate-800/50 border-slate-600' : 'bg-gray-50 border-gray-200'}`}>
-                                <label className={`font-bold text-sm mb-3 block ${themeUI.textTitle}`}>Danh sách tiêu chí:</label>
-                                <div className={`overflow-y-auto flex-1 pr-1 flex flex-col gap-2 ${isDarkMode ? 'custom-dark-scrollbar' : 'custom-light-scrollbar'}`}>
-                                    {!hasPreviewed ? (<p className={`text-xs italic text-center mt-4 ${themeUI.textMuted}`}>Nhập công thức bên trái và bấm <br /><b>"Kiểm tra cấu trúc"</b><br /> để hệ thống bóc tách các tiêu chí.</p>) : previewVariables.length === 0 ? (<p className="text-xs text-red-500 font-bold text-center mt-4">Không tìm thấy tiêu chí nào hợp lệ.</p>) : (previewVariables.map((v, i) => (<div key={`preview-var-${i}`} className={`px-3 py-2 border rounded text-xs font-bold truncate transition-colors ${isDarkMode ? 'bg-indigo-900/30 text-indigo-300 border-indigo-700/50' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`} title={v}>{v}</div>)))}
+
+                            {/* PREVIEW/HELP SECTION */}
+                            <div className="lg:col-span-4 flex flex-col gap-6">
+                                <div className={`p-6 rounded-2xl border shadow-sm flex-1 ${isDarkMode ? 'bg-slate-800/40 border-slate-700' : 'bg-white border-slate-200'}`}>
+                                    <h4 className={`font-bold text-xs uppercase tracking-widest mb-4 ${themeUI.textMuted}`}>Cấu trúc tiêu chí bóc tách:</h4>
+                                    
+                                    {!hasPreviewed ? (
+                                        <div className="flex flex-col items-center justify-center h-full text-center py-12 opacity-50">
+                                            <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-4">
+                                                <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                            </div>
+                                            <p className="text-xs italic px-6">Hãy nhập công thức bên trái và bấm "Kiểm tra cấu trúc" để hệ thống phân tích các tiêu chí thành phần.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                                            {previewVariables.length > 0 ? (
+                                                previewVariables.map((v, idx) => (
+                                                    <div key={idx} className={`p-3 rounded-lg border flex items-center justify-between text-xs transition-all ${isDarkMode ? 'bg-slate-900/50 border-slate-700 hover:border-indigo-500/50' : 'bg-slate-50 border-slate-200 hover:border-indigo-500/50'}`}>
+                                                        <span className="font-mono font-bold text-indigo-500 truncate mr-2">{v}</span>
+                                                        <span className="shrink-0 px-2 py-0.5 bg-indigo-500/10 text-indigo-500 rounded-md font-black text-[9px] uppercase tracking-wider">Dependency</span>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <p className="text-xs text-green-500 font-bold bg-green-500/10 p-3 rounded-lg border border-green-500/20 flex items-center gap-2">
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                                                    Công thức không có biến phụ thuộc.
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
-                        <div className="mt-8 border-t pt-6 dark:border-slate-700 shrink-0">
-                            <div className="flex justify-between items-center mb-4">
-                                <label className={`font-bold text-sm block ${themeUI.textTitle}`}>Danh sách công thức đã lưu ({customFormulas.length}):</label>
-                                <div className="flex items-center gap-3">
-                                    <input type="file" accept=".xlsx, .xls" className="hidden" ref={importFormulaRef} onChange={handleImportFormulas} />
-                                    <button onClick={() => importFormulaRef.current.click()} className="px-3 py-1.5 text-xs font-bold text-indigo-600 bg-indigo-100 dark:bg-indigo-900/40 dark:text-indigo-300 rounded hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors shadow-sm flex items-center border border-indigo-200 dark:border-indigo-700/50"><svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>Import từ Excel</button>
+
+                        {/* LIST SECTION */}
+                        <div className="mt-8 border-t pt-8 dark:border-slate-800 shrink-0">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                                <div className="flex flex-col gap-1">
+                                    <label className={`font-bold text-sm block ${themeUI.textTitle}`}>Danh sách công thức đã lưu ({customFormulas.length}):</label>
+                                    <p className={`text-[10px] ${themeUI.textMuted}`}>Các công thức này sẽ được áp dụng khi chạy Đối soát.</p>
+                                </div>
+                                <div className="flex items-center gap-3 w-full sm:w-auto">
+                                    <div className="relative flex-1 sm:w-64">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Tìm mã tiêu chí hoặc nội dung..." 
+                                            value={formulaSearch}
+                                            onChange={(e) => setFormulaSearch(e.target.value)}
+                                            className={`w-full pl-9 pr-3 py-1.5 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all ${themeUI.inputBg}`}
+                                        />
+                                        <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                        </svg>
+                                        {formulaSearch && (
+                                            <button onClick={() => setFormulaSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        )}
+                                    </div>
+                                    <button onClick={() => setIsImportModalOpen(true)} className="px-4 py-1.5 text-xs font-bold text-indigo-600 bg-indigo-100 dark:bg-indigo-900/40 dark:text-indigo-300 rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-all shadow-sm flex items-center border border-indigo-200 dark:border-indigo-700/50 whitespace-nowrap"><svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>Import từ Excel</button>
                                 </div>
                             </div>
-                            {customFormulas.length === 0 ? (<p className={`text-sm italic ${themeUI.textMuted}`}>Chưa có công thức nào được tạo.</p>) : (<div className={`grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3 max-h-[250px] overflow-y-auto pr-1 ${isDarkMode ? 'custom-dark-scrollbar' : 'custom-light-scrollbar'}`}>{customFormulas.map((f, idx) => (<div key={idx} className={`flex items-center justify-between p-3 border rounded-lg shadow-sm ${isDarkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-gray-200'} ${editingFormulaIdx === idx ? 'ring-2 ring-indigo-500 border-indigo-500' : ''}`}><div className="flex flex-col gap-1 w-full min-w-0 pr-4"><span className={`font-bold text-sm ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{f.targetCol}</span><span className={`font-mono text-xs truncate ${themeUI.textMain}`} title={f.expression}>{f.expression}</span></div><div className="flex gap-1 shrink-0"><button onClick={() => { setChainViewFormula(f); setPreviousStep(currentStep); setCurrentStep('chain_trace'); }} className="p-2 text-amber-500 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded transition-colors" title="Truy nguồn gốc (Chain Tracer)"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg></button><button onClick={() => { setGraphViewFormula(f); setIsGraphOpen(true); }} className="p-2 text-indigo-500 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded transition-colors" title="Xem sơ đồ phụ thuộc (Mindmap)"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2" /></svg></button><button onClick={() => handleEditClick(f, idx)} className="p-2 text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded transition-colors" title="Sửa công thức này"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></button><button onClick={() => handleDeleteClick(idx)} className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 rounded transition-colors" title="Xóa"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button></div></div>))}</div>)}
+                            {customFormulas.length === 0 ? (
+                                <p className={`text-sm italic ${themeUI.textMuted}`}>Chưa có công thức nào được tạo.</p>
+                            ) : (
+                                <div className={`grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3 max-h-[350px] overflow-y-auto pr-1 ${isDarkMode ? 'custom-dark-scrollbar' : 'custom-light-scrollbar'}`}>
+                                    {customFormulas
+                                        .map((f, idx) => ({ ...f, originalIdx: idx }))
+                                        .filter(f => 
+                                            f.targetCol.toLowerCase().includes(formulaSearch.toLowerCase()) || 
+                                            f.expression.toLowerCase().includes(formulaSearch.toLowerCase())
+                                        )
+                                        .map((f) => (
+                                            <div key={f.originalIdx} className={`flex items-center justify-between p-3 border rounded-lg shadow-sm group transition-all hover:shadow-md ${isDarkMode ? 'bg-slate-800 border-slate-600 hover:border-slate-500' : 'bg-white border-gray-200 hover:border-indigo-300'} ${editingFormulaIdx === f.originalIdx ? 'ring-2 ring-indigo-500 border-indigo-500' : ''}`}>
+                                                <div className="flex flex-col gap-1 w-full min-w-0 pr-4">
+                                                    <span className={`font-bold text-sm truncate ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{f.targetCol}</span>
+                                                    <span className={`font-mono text-[10px] truncate ${themeUI.textMain} opacity-70`} title={f.expression}>{f.expression}</span>
+                                                </div>
+                                                <div className="flex gap-1 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity">
+                                                    <button onClick={() => { setChainViewFormula(f); setPreviousStep(currentStep); setCurrentStep('chain_trace'); }} className="p-1.5 text-amber-500 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded transition-colors" title="Truy nguồn gốc (Chain Tracer)"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg></button>
+                                                    <button onClick={() => { setGraphViewFormula(f); setIsGraphOpen(true); }} className="p-1.5 text-indigo-500 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded transition-colors" title="Xem sơ đồ phụ thuộc (Mindmap)"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2" /></svg></button>
+                                                    <button onClick={() => handleEditClick(f, f.originalIdx)} className="p-1.5 text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded transition-colors" title="Sửa công thức này"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></button>
+                                                    <button onClick={() => handleDeleteClick(f.originalIdx)} className="p-1.5 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 rounded transition-colors" title="Xóa"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    {customFormulas.filter(f => f.targetCol.toLowerCase().includes(formulaSearch.toLowerCase()) || f.expression.toLowerCase().includes(formulaSearch.toLowerCase())).length === 0 && (
+                                        <div className="col-span-full py-12 text-center">
+                                            <p className={`text-sm italic ${themeUI.textMuted}`}>Không tìm thấy công thức nào khớp với "{formulaSearch}"</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
@@ -161,6 +284,14 @@ export function FormulaAssistant() {
                     </div>
                 )}
             </div>
+            <FormulaImportModal 
+                isOpen={isImportModalOpen} 
+                onClose={() => setIsImportModalOpen(false)} 
+                files={importFiles}
+                setFiles={setImportFiles}
+                onExtract={handleExtractFormulas}
+                importRef={importFormulaRef}
+            />
         </div>
     );
 }
