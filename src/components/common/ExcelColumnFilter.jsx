@@ -9,9 +9,6 @@ const ExcelColumnFilter = ({ title, uniqueValues, activeFilters, onApplyFilter, 
 
   useEffect(() => {
     if (isOpen) {
-      // Khởi tạo selection dựa trên activeFilters hiện tại,
-      // nhưng chỉ giữ những giá trị CÒN TỒN TẠI trong danh sách uniqueValues theo ngữ cảnh hiện tại.
-      // Nếu chưa có filter nào → mặc định chọn tất cả.
       if (activeFilters && activeFilters.length > 0) {
         const validSelected = activeFilters.filter(v => uniqueValues.includes(v));
         setSelected(validSelected.length > 0 ? validSelected : [...uniqueValues]);
@@ -20,22 +17,39 @@ const ExcelColumnFilter = ({ title, uniqueValues, activeFilters, onApplyFilter, 
       }
       setSearch('');
       const rect = wrapperRef.current.getBoundingClientRect();
-      const menuHeight = 280; 
+      // Popup thực tế cao ~340px (header 55 + list 224 + footer 55)
+      const POPUP_HEIGHT = 360;
       const spaceBelow = window.innerHeight - rect.bottom;
-      
-      let topPos = rect.bottom + 4;
-      if (spaceBelow < menuHeight && rect.top > menuHeight) {
-          topPos = rect.top - menuHeight - 4;
+      const spaceAbove = rect.top;
+
+      let topPos;
+      if (spaceBelow >= POPUP_HEIGHT) {
+        // Đủ chỗ phía dưới → render xuống dưới
+        topPos = rect.bottom + 4;
+      } else if (spaceAbove >= POPUP_HEIGHT) {
+        // Đủ chỗ phía trên → render lên trên
+        topPos = rect.top - POPUP_HEIGHT - 4;
+      } else {
+        // Không đủ chỗ cả hai phía → chọn phía rộng hơn và clamp vào viewport
+        if (spaceBelow >= spaceAbove) {
+          topPos = rect.bottom + 4;
+        } else {
+          topPos = Math.max(8, rect.top - POPUP_HEIGHT - 4);
+        }
       }
-      const leftPos = Math.min(rect.left, window.innerWidth - 260); 
+
+      // Đảm bảo popup không bị lòi khỏi cạnh phải màn hình
+      const leftPos = Math.min(rect.left, window.innerWidth - 268);
       setMenuStyle({
         position: 'fixed',
         top: `${topPos}px`,
         left: `${leftPos}px`,
         zIndex: 999999,
+        maxHeight: `${Math.min(POPUP_HEIGHT, window.innerHeight - 16)}px`,
       });
     }
   }, [isOpen, activeFilters, uniqueValues]);
+
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -107,7 +121,8 @@ const ExcelColumnFilter = ({ title, uniqueValues, activeFilters, onApplyFilter, 
       </div>
 
       {isOpen && (
-        <div className={`excel-filter-popup fixed ${theme.bg} ${theme.text} border ${theme.border} shadow-2xl rounded-lg w-64 flex flex-col font-sans normal-case text-[13px] tracking-normal`} style={menuStyle}>
+        <div className={`excel-filter-popup fixed ${theme.bg} ${theme.text} border ${theme.border} shadow-2xl rounded-lg w-64 flex flex-col font-sans normal-case text-[13px] tracking-normal overflow-hidden`} style={menuStyle}>
+
            <div className={`p-3 border-b ${theme.border}`}>
                <div className="relative">
                    <input 
@@ -143,4 +158,4 @@ const ExcelColumnFilter = ({ title, uniqueValues, activeFilters, onApplyFilter, 
   );
 };
 
-export default ExcelColumnFilter;
+export default React.memo(ExcelColumnFilter);

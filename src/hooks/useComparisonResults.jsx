@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import CompareWorker from '../utils/compareWorker?worker';
@@ -69,12 +69,21 @@ export function useComparisonResults(
             return;
         }
 
+        // Lưu lại danh sách cột đang hiển thị trước khi chạy lại
+        // để khôi phục sau khi so sánh hoàn tất (tránh reset cột người dùng đã chọn)
+        const savedDisplayCols = displayCols.length > 0 ? [...displayCols] : null;
+
+        // Lưu lại bộ lọc hàng và trạng thái filter tổng trước khi chạy lại
+        // để khôi phục đúng ngữ cảnh người dùng đang xem khi áp dụng cấu hình nâng cao
+        const savedExcelFilters = { ...excelFilters };
+        const savedGlobalFilter = globalFilter;
+
         setIsProcessing(true);
         setProcessingMsg('Khởi tạo tiến trình đối soát...');
         setResults(null);
         diffNavTracker.current = {};
         setSelectedEmpIdForTest('');
-        setExcelFilters({}); // Reset bộ lọc cột từ lần chạy trước
+        setExcelFilters({}); // Reset bộ lọc hàng từ lần chạy trước
         setGlobalFilter('all'); // Reset filter tổng về mặc định
 
         setTimeout(() => {
@@ -87,10 +96,15 @@ export function useComparisonResults(
                     } else if (e.data.type === 'success') {
                         setResults(e.data.results);
                         setUniqueValuesCache(e.data.uniqueValuesCache || {});
-                        setCurrentStep(4); // Navigate to results step
+                        setCurrentStep(4);
                         setIsProcessing(false);
                         setProcessingMsg('');
-                        worker.terminate(); // Đóng Worker giải phóng RAM
+                        // Khôi phục danh sách cột hiển thị mà người dùng đã thiết lập
+                        if (savedDisplayCols) setDisplayCols(savedDisplayCols);
+                        // Khôi phục bộ lọc hàng và trạng thái filter tổng
+                        setExcelFilters(savedExcelFilters);
+                        setGlobalFilter(savedGlobalFilter);
+                        worker.terminate();
                     } else if (e.data.type === 'error') {
                         alert("Lỗi tiến trình ngầm: " + e.data.message);
                         setIsProcessing(false);
@@ -105,7 +119,7 @@ export function useComparisonResults(
                     targetFiles: targetFiles.map(tf => ({ wb: tf.wb, sheet: tf.sheet, headers: tf.headers, headerRowIdx: tf.headerRowIdx, id: tf.id, customName: tf.customName, name: tf.name })),
                     columnMappings,
                     keyCol,
-                    compareColumns: getCompareColumns, // Use the memoized compare columns
+                    compareColumns: getCompareColumns,
                     customFormulas,
                     advancedRules
                 });
@@ -117,6 +131,7 @@ export function useComparisonResults(
             }
         }, 200);
     };
+
 
     const activeValCols = useMemo(() => valCols.filter(c => displayCols.includes(c)), [valCols, displayCols]);
 
@@ -153,8 +168,17 @@ export function useComparisonResults(
             }
 
             if (globalSearchText) {
-                const rowString = JSON.stringify(row).toLowerCase();
-                if (!rowString.includes(globalSearchText.toLowerCase())) return false;
+                // Tối ưu: tìm trực tiếp trong các trường có nghĩa, tránh JSON.stringify tốn kém
+                const q = globalSearchText.toLowerCase();
+                const found =
+                    String(row[keyCol]).toLowerCase().includes(q) ||
+                    row.status.some(s => String(s).toLowerCase().includes(q)) ||
+                    Object.values(row.baseVals).some(v => String(v).toLowerCase().includes(q)) ||
+                    Object.values(row.targetVals).some(tfVals =>
+                        tfVals && !tfVals._error &&
+                        Object.values(tfVals).some(v => String(v).toLowerCase().includes(q))
+                    );
+                if (!found) return false;
             }
 
             // Logic lọc từng cột (sử dụng Set để đạt O(1))
@@ -183,11 +207,17 @@ export function useComparisonResults(
         });
     }, [results, globalFilter, globalSearchText, excelFilters, targetFiles, activeValCols, keyCol]); // Added keyCol as dependency for rowMatchesCurrentView
 
-    const getUniqueValues = (cKey) => {
+    const getUniqueValues = useCallback((cKey) => {
         if (!results) return [];
 
-        // Lấy các giá trị duy nhất từ filteredResults HIỆN TẠI,
-        // nhưng bỏ qua filter của chính cột đang được mở (để vẫn thấy đủ lựa chọn).
+        // FAST PATH: không có filter nào khác và không search → dùng cache từ Worker (O(1))
+        const hasOtherActiveFilters = Object.entries(excelFilters)
+            .some(([k, v]) => k !== cKey && v && v.length > 0);
+        if (!hasOtherActiveFilters && !globalSearchText && globalFilter === 'all') {
+            return uniqueValuesCache[cKey] || [];
+        }
+
+        // SLOW PATH: có filter khác đang active → tính cascade (bỏ qua self-filter)
         const filterSetsWithoutSelf = {};
         for (const [k, allowedVals] of Object.entries(excelFilters)) {
             if (k !== cKey && allowedVals && allowedVals.length > 0) {
@@ -195,8 +225,9 @@ export function useComparisonResults(
             }
         }
 
+        const q = globalSearchText ? globalSearchText.toLowerCase() : '';
+
         const rowsInScope = results.filter(row => {
-            // Global filter
             if (globalFilter === 'missing' && !row.isMissing) return false;
             let hasVisibleDiff = false;
             if (!row.isMissing) {
@@ -209,12 +240,18 @@ export function useComparisonResults(
             if (globalFilter === 'diff' && (row.isMissing || !hasVisibleDiff)) return false;
             if (globalFilter === 'match' && (row.isMissing || hasVisibleDiff)) return false;
 
-            // Global search
-            if (globalSearchText) {
-                if (!JSON.stringify(row).toLowerCase().includes(globalSearchText.toLowerCase())) return false;
+            if (q) {
+                const found =
+                    String(row[keyCol]).toLowerCase().includes(q) ||
+                    row.status.some(s => String(s).toLowerCase().includes(q)) ||
+                    Object.values(row.baseVals).some(v => String(v).toLowerCase().includes(q)) ||
+                    Object.values(row.targetVals).some(tfVals =>
+                        tfVals && !tfVals._error &&
+                        Object.values(tfVals).some(v => String(v).toLowerCase().includes(q))
+                    );
+                if (!found) return false;
             }
 
-            // Other column filters (skip self)
             for (const k in filterSetsWithoutSelf) {
                 const allowedSet = filterSetsWithoutSelf[k];
                 let rowVals = [];
@@ -253,7 +290,7 @@ export function useComparisonResults(
             }
         });
         return Array.from(vals).sort((a, b) => String(a).localeCompare(String(b), 'vi', { numeric: true }));
-    };
+    }, [results, excelFilters, globalFilter, globalSearchText, uniqueValuesCache, activeValCols, targetFiles, keyCol]);
 
     // TỐI ƯU HÓA: Chỉ tính toán lại thống kê tổng quan khi mảng results thay đổi
     const overviewStats = useMemo(() => {
@@ -293,15 +330,23 @@ export function useComparisonResults(
         }
     };
 
-    const getColDiffCount = (colKey) => {
-        if (!filteredResults) return 0;
-        let count = 0;
-        filteredResults.forEach(row => {
-            const isDiff = targetFiles.some(tf => row.diffCells[`${colKey}_${tf.id}`]);
-            if (isDiff && !row.isMissing) count++;
-        });
-        return count;
-    };
+    // TỐI ƯU: tính toán 1 lần cho tất cả cột, thay vì N lần mỗi render (O(rows×cols) → O(1) per call)
+    const colDiffCountMap = useMemo(() => {
+        const map = {};
+        if (!filteredResults) return map;
+        for (const col of activeValCols) { map[col] = 0; }
+        for (const row of filteredResults) {
+            if (row.isMissing) continue;
+            for (const col of activeValCols) {
+                if (targetFiles.some(tf => row.diffCells[`${col}_${tf.id}`])) {
+                    map[col]++;
+                }
+            }
+        }
+        return map;
+    }, [filteredResults, activeValCols, targetFiles]);
+
+    const getColDiffCount = useCallback((colKey) => colDiffCountMap[colKey] || 0, [colDiffCountMap]);
 
     const handleExportExcel = async () => {
         if (!filteredResults || filteredResults.length === 0) {

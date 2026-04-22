@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { isSTT, normalizeHeader, stringSimilarity } from '../utils/excelUtils'; // Import isSTT
 
 const getAutoCompareColumns = (headers, keyColumn) => {
@@ -17,6 +17,14 @@ export function useComparisonConfig(baseFile, targetFiles) {
     const [advSelectedCol, setAdvSelectedCol] = useState('');
     const [advSearchCol, setAdvSearchCol] = useState('');
     const [isAdvComboOpen, setIsAdvComboOpen] = useState(false);
+    const advComboRef = useRef(null); // Ref cho dropdown "Chọn cột cần cấu hình"
+
+    // Danh sách cột được lọc theo advSearchCol để hiển thị trong dropdown
+    const filteredAdvCols = useMemo(() => {
+        const search = advSearchCol.toLowerCase().trim();
+        if (!search) return availableCols;
+        return availableCols.filter(c => c.toLowerCase().includes(search));
+    }, [availableCols, advSearchCol]);
 
     // Column Mapping
     const [columnMappings, setColumnMappings] = useState({});
@@ -112,6 +120,7 @@ export function useComparisonConfig(baseFile, targetFiles) {
         availableCols, keyCol, setKeyCol, valCols, setValCols,
         advancedRules, setAdvancedRules, showAdvancedOptions, setShowAdvancedOptions,
         advSelectedCol, setAdvSelectedCol, advSearchCol, setAdvSearchCol, isAdvComboOpen, setIsAdvComboOpen,
+        advComboRef, filteredAdvCols,
         columnMappings, setColumnMappings, showMapped, setShowMapped, mappingFilters, setMappingFilters,
         missingKeyTargets, getMappingUnique, mappingColsToShow, getAutoCompareColumns, isSTT,
     };
