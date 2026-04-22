@@ -6,16 +6,13 @@ import { FormulaProvider } from './FormulaContext';
 
 export const AppProvider = ({ children }) => {
     const defaultMockFormulas = [
-        { targetCol: 'TotalIncome', expression: 'BasicSalary + Allowance + Bonus' },
-        { targetCol: 'SocialInsurance', expression: 'BasicSalary * 0.08' },
-        { targetCol: 'HealthInsurance', expression: 'BasicSalary * 0.015' },
-        { targetCol: 'DependentDeduction', expression: 'NumberOfDependents * 4400000' },
-        { targetCol: 'TaxableIncome', expression: 'TotalIncome - DependentDeduction - SocialInsurance - HealthInsurance' },
-        { targetCol: 'PersonalIncomeTax', expression: 'dbo.CalculatePIT(TaxableIncome)' },
-        { targetCol: 'NetSalary', expression: 'TotalIncome - PersonalIncomeTax' },
-        { targetCol: 'BonusTier', expression: 'CASE WHEN KPI >= 90 THEN 5000000 WHEN KPI >= 70 THEN 2000000 ELSE 0 END' },
-        { targetCol: 'FinalPaycheck', expression: 'NetSalary + BonusTier + AdvancePayment - DebtDeduction' },
-        { targetCol: 'DiscrepancyAmount', expression: 'isnull(FinalPaycheck, 0) - isnull(SysFinalPaycheck, 0)' }
+        { targetCol: 'Total_Net_Salary', expression: 'ROUND(Base_Salary + Performance_Bonus - Social_Insurance_Amt, 0)' },
+        { targetCol: 'Performance_Bonus', expression: 'CASE WHEN KPI_Score >= 100 THEN Base_Salary * 0.2 WHEN KPI_Score >= 80 THEN Base_Salary * 0.1 ELSE 0 END' },
+        { targetCol: 'Social_Insurance_Amt', expression: 'IF(Is_Full_Insurance == 1, Base_Salary * 0.105, Min_Wages * 0.105)' },
+        { targetCol: 'Is_Full_Insurance', expression: '1' },
+        { targetCol: 'KPI_Score', expression: '95' },
+        { targetCol: 'Base_Salary', expression: '15000000' },
+        { targetCol: 'Min_Wages', expression: '4420000' }
     ];
 
     const [customFormulas, setCustomFormulas] = useState(defaultMockFormulas);

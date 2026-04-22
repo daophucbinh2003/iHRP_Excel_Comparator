@@ -17,6 +17,7 @@ const TopNavbar = () => {
     else if (currentStep === 'rename') backAction = () => setCurrentStep(3);
     else if (currentStep === 4) backAction = () => setCurrentStep(3);
     else if (currentStep === 'formula') backAction = () => setCurrentStep(previousStep);
+    else if (currentStep === 'chain_trace') backAction = () => setCurrentStep('formula');
 
     return (
         <header className="bg-slate-900 text-white flex items-center justify-between px-6 py-3 shrink-0 shadow-md relative z-50">

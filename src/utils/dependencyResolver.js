@@ -112,5 +112,58 @@ export const buildDependencyGraph = (rootFormula, allFormulas, excelColumnsLower
         nodes: Array.from(nodesMap.values()),
         links: links
     };
+
+};
+
+/**
+ * Phân tách một công thức thành cấu trúc cây phân cấp (Tree) để hiển thị sơ đồ luồng (Chain)
+ * @param {Object} rootFormula - Công thức gốc { targetCol, expression }
+ * @param {Array} allFormulas - Danh sách tất cả công thức đã lưu
+ * @param {Set} excelColumnsLowerCase - Set chứa các cột Excel (chữ thường) để xác thực
+ * @returns {Object} { id, label, type, expression, children: [] }
+ */
+export const buildChainTree = (rootFormula, allFormulas, excelColumnsLowerCase = new Set()) => {
+    if (!rootFormula) return null;
+
+    const visited = new Set();
+
+    const buildNode = (fName, expr = '') => {
+        const lowerName = String(fName).toLowerCase();
+        
+        // Tránh loop vô tận
+        if (visited.has(lowerName)) {
+            return { id: fName, label: fName, type: 'circular', expression: expr, children: [] };
+        }
+        visited.add(lowerName);
+
+        const currentFormula = allFormulas.find(f => String(f.targetCol).toLowerCase() === lowerName);
+        const finalExpr = currentFormula ? currentFormula.expression : expr;
+        
+        let type = 'source';
+        if (currentFormula) {
+            type = 'formula';
+        } else if (excelColumnsLowerCase.size > 0 && !excelColumnsLowerCase.has(lowerName)) {
+            type = 'error';
+        }
+
+        const variables = currentFormula ? extractVariables(currentFormula.expression) : [];
+        const children = variables.map(v => {
+            const childFormula = allFormulas.find(cf => String(cf.targetCol).toLowerCase() === String(v).toLowerCase());
+            return buildNode(v, childFormula?.expression || '');
+        });
+
+        // Xóa khỏi visited sau khi xong nhánh này để các nhánh khác vẫn có thể tham chiếu đến cùng 1 node (nhưng không phải tổ tiên)
+        visited.delete(lowerName);
+
+        return {
+            id: `${fName}_${Math.random().toString(36).substr(2, 9)}`,
+            label: fName,
+            type,
+            expression: finalExpr,
+            children
+        };
+    };
+
+    return buildNode(rootFormula.targetCol, rootFormula.expression);
 };
 

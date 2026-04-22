@@ -82,19 +82,14 @@ export const extractVariables = (expr) => {
             if (t.type === 'VAR') {
                 const valLower = t.value.toLowerCase();
                 
-                // 1. Kiểm tra Rule 1: Nếu tiếp theo là dấu '(', đó là lời gọi hàm -> Bỏ qua
+                // 1. Skip functions
                 const nextToken = tokens[i + 1];
                 if (nextToken && nextToken.type === 'PUNC' && nextToken.value === '(') {
                     continue;
                 }
 
-                // 2. Kiểm tra Rule 2: Nếu nằm trong danh sách Blacklist -> Bỏ qua
+                // 2. Skip blacklist
                 if (functionBlacklist.has(valLower)) {
-                    continue;
-                }
-
-                // 3. Nếu là định danh kiểu dbo.schema -> Thường là hàm trong context này
-                if (t.value.includes('.') && valLower.startsWith('dbo.')) {
                     continue;
                 }
 
@@ -127,7 +122,26 @@ export const evaluateFormula = (expr, variablesObj, enableLog = false) => {
             const t = consume();
             if (!t) return null;
             if (t.type === 'NUMBER' || t.type === 'STRING') return { type: 'LITERAL', value: t.value };
-            if (t.type === 'VAR') return { type: 'VAR', name: t.value };
+            if (t.type === 'VAR') {
+                // Check if it's a function call
+                if (peek() && peek().type === 'PUNC' && peek().value === '(') {
+                    consume(); // consume '('
+                    const args = [];
+                    if (peek() && peek().value !== ')') {
+                        while (true) {
+                            args.push(parseExpr());
+                            if (peek() && peek().value === ',') {
+                                consume();
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                    if (peek() && peek().value === ')') consume(); // consume ')'
+                    return { type: 'CALL', name: t.value.toLowerCase(), args };
+                }
+                return { type: 'VAR', name: t.value };
+            }
             if (t.type === 'OP' && (t.value === '-' || t.value === '+')) {
                 const expr = parseOp(6);
                 return { type: 'UNARY', op: t.value, expr };
@@ -217,6 +231,7 @@ export const evaluateFormula = (expr, variablesObj, enableLog = false) => {
             if (node.type === 'BETWEEN') return `${stringifyAST(node.left)} BETWEEN ${stringifyAST(node.min)} AND ${stringifyAST(node.max)}`;
             if (node.type === 'IN') return `${stringifyAST(node.left)} IN (${node.list.map(stringifyAST).join(', ')})`;
             if (node.type === 'CASE') return `(Biểu thức CASE lồng)`;
+            if (node.type === 'CALL') return `${node.name.toUpperCase()}(${node.args.map(stringifyAST).join(', ')})`;
             return '';
         };
 
@@ -292,6 +307,23 @@ export const evaluateFormula = (expr, variablesObj, enableLog = false) => {
                 const l = String(evalNode(node.left)).toLowerCase();
                 const vals = node.list.map(n => String(evalNode(n)).toLowerCase());
                 return vals.includes(l);
+            }
+            if (node.type === 'CALL') {
+                const evaluatedArgs = node.args.map(evalNode);
+                if (node.name === 'round') {
+                    const val = Number(evaluatedArgs[0]);
+                    const precision = evaluatedArgs[1] !== undefined ? Number(evaluatedArgs[1]) : 0;
+                    const factor = Math.pow(10, precision);
+                    return Math.round(val * factor) / factor;
+                }
+                if (node.name === 'if') {
+                    const cond = evaluatedArgs[0];
+                    const trueRes = evaluatedArgs[1];
+                    const falseRes = evaluatedArgs[2];
+                    return cond ? trueRes : falseRes;
+                }
+                if (node.name === 'abs') return Math.abs(Number(evaluatedArgs[0]));
+                return null;
             }
             if (node.type === 'CASE') {
                 for (const c of node.cases) {

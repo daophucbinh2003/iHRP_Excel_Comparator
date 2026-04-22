@@ -13,6 +13,8 @@ export const FormulaProvider = ({ children, customFormulas, setCustomFormulas, s
 
     const [graphViewFormula, setGraphViewFormula] = useState(null);
     const [isGraphOpen, setIsGraphOpen] = useState(false);
+    const [chainViewFormula, setChainViewFormula] = useState(null);
+    const [isChainOpen, setIsChainOpen] = useState(false);
 
     const formulaAssistantProps = useFormulaAssistant(
         baseFile,
@@ -30,7 +32,9 @@ export const FormulaProvider = ({ children, customFormulas, setCustomFormulas, s
             customFormulas, setCustomFormulas,
             selectedEmpIdForTest, setSelectedEmpIdForTest,
             graphViewFormula, setGraphViewFormula,
-            isGraphOpen, setIsGraphOpen
+            isGraphOpen, setIsGraphOpen,
+            chainViewFormula, setChainViewFormula,
+            isChainOpen, setIsChainOpen
         }}>
             {children}
         </FormulaContext.Provider>

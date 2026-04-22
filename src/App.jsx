@@ -6,6 +6,7 @@ import { ConfigStep } from './features/step3_config/ConfigStep';
 import ResultsStep from './features/step4_results/ResultsStep';
 import { FormulaAssistant } from './features/formula_assistant/FormulaAssistant';
 import { FormulaGraphOverlay } from './features/formula_assistant/FormulaGraphOverlay';
+import { FormulaChainTracer } from './features/formula_assistant/FormulaChainTracer';
 import AdvancedOptionsModal from './features/step3_config/AdvancedOptionsModal';
 import TopNavbar from './components/layout/TopNavbar';
 import ToastNotification from './components/common/ToastNotification';
@@ -64,7 +65,7 @@ function App() {
 
       {/* NỘI DUNG CHÍNH */}
       <main className={`flex-1 overflow-y-auto p-4 md:p-6 relative ${isDarkMode ? 'custom-dark-scrollbar' : 'custom-light-scrollbar'}`}>
-        <div className={`mx-auto h-full flex flex-col ${[2, 4, 'formula'].includes(currentStep) ? 'w-full max-w-[100%]' : 'max-w-5xl'}`}>
+        <div className={`mx-auto h-full flex flex-col ${[2, 4, 'formula', 'chain_trace'].includes(currentStep) ? 'w-full max-w-[100%]' : 'max-w-5xl'}`}>
 
           {/* STEP 1: UPLOAD */}
           {currentStep === 1 && <UploadStep />}
@@ -80,6 +81,9 @@ function App() {
 
           {/* STEP formula: TRỢ LÝ CÔNG THỨC */}
           {currentStep === 'formula' && <FormulaAssistant />}
+
+          {/* STEP chain_trace: TRUY NGUỒN CÔNG THỨC */}
+          {currentStep === 'chain_trace' && <FormulaChainTracer />}
 
         </div>
       </main>
