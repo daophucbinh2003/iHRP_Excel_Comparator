@@ -6,7 +6,7 @@ import { ConfigStep } from './features/step3_config/ConfigStep';
 import ResultsStep from './features/step4_results/ResultsStep';
 import { FormulaAssistant } from './features/formula_assistant/FormulaAssistant';
 import { FormulaGraphOverlay } from './features/formula_assistant/FormulaGraphOverlay';
-import { FormulaChainTracer } from './features/formula_assistant/FormulaChainTracer';
+import { FormulaInteractiveGraph } from './features/formula_assistant/FormulaInteractiveGraph';
 import AdvancedOptionsModal from './features/step3_config/AdvancedOptionsModal';
 import TopNavbar from './components/layout/TopNavbar';
 import ToastNotification from './components/common/ToastNotification';
@@ -83,7 +83,7 @@ function App() {
           {currentStep === 'formula' && <FormulaAssistant />}
 
           {/* STEP chain_trace: TRUY NGUỒN CÔNG THỨC */}
-          {currentStep === 'chain_trace' && <FormulaChainTracer />}
+          {currentStep === 'chain_trace' && <FormulaInteractiveGraph />}
 
         </div>
       </main>

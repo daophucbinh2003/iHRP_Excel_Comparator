@@ -74,7 +74,7 @@ export const extractVariables = (expr) => {
             'getdate', 'datediff', 'dateadd', 'convert', 'cast',
             'sum', 'avg', 'max', 'min', 'count', 'len', 'replace',
             'substring', 'left', 'right', 'charindex', 'ltrim', 'rtrim',
-            'case', 'when', 'then', 'else', 'end', 'and', 'or', 'not', 'in', 'is', 'null', 'like'
+            'case', 'when', 'then', 'else', 'end', 'and', 'or', 'not', 'in', 'is', 'null', 'like', 'if'
         ]);
 
         for (let i = 0; i < tokens.length; i++) {
@@ -82,14 +82,30 @@ export const extractVariables = (expr) => {
             
             if (t.type === 'VAR') {
                 const valLower = t.value.toLowerCase();
-                
-                // 1. Skip functions
                 const nextToken = tokens[i + 1];
-                if (nextToken && nextToken.type === 'PUNC' && nextToken.value === '(') {
-                    continue;
+                const isFunctionCall = nextToken && nextToken.type === 'PUNC' && nextToken.value === '(';
+
+                if (isFunctionCall) {
+                    if (functionBlacklist.has(valLower)) {
+                        // Hàm SQL chuẩn: Bỏ qua tên hàm nhưng tiếp tục quét các biến bên trong ngoặc ở các vòng lặp sau
+                        continue;
+                    } else {
+                        // HÀM TÙY CHỈNH (Custom Function): Coi tên hàm là 1 biến và NHẢY QUA toàn bộ tham số bên trong
+                        vars.add(t.value);
+                        let depth = 0;
+                        let j = i + 1; // Nhảy đến dấu '('
+                        while (j < tokens.length) {
+                            if (tokens[j].type === 'PUNC' && tokens[j].value === '(') depth++;
+                            if (tokens[j].type === 'PUNC' && tokens[j].value === ')') depth--;
+                            if (depth === 0) break;
+                            j++;
+                        }
+                        i = j; // Nhảy con trỏ i đến dấu ')' để bỏ qua toàn bộ tham số
+                        continue;
+                    }
                 }
 
-                // 2. Skip blacklist
+                // Biến thông thường
                 if (functionBlacklist.has(valLower)) {
                     continue;
                 }
@@ -139,7 +155,7 @@ export const evaluateFormula = (expr, variablesObj, enableLog = false) => {
                         }
                     }
                     if (peek() && peek().value === ')') consume(); // consume ')'
-                    return { type: 'CALL', name: t.value.toLowerCase(), args };
+                    return { type: 'CALL', name: t.value.toLowerCase(), originalName: t.value, args };
                 }
                 return { type: 'VAR', name: t.value };
             }
@@ -232,7 +248,7 @@ export const evaluateFormula = (expr, variablesObj, enableLog = false) => {
             if (node.type === 'BETWEEN') return `${stringifyAST(node.left)} BETWEEN ${stringifyAST(node.min)} AND ${stringifyAST(node.max)}`;
             if (node.type === 'IN') return `${stringifyAST(node.left)} IN (${node.list.map(stringifyAST).join(', ')})`;
             if (node.type === 'CASE') return `(Biểu thức CASE lồng)`;
-            if (node.type === 'CALL') return `${node.name.toUpperCase()}(${node.args.map(stringifyAST).join(', ')})`;
+            if (node.type === 'CALL') return `${(node.originalName || node.name).toUpperCase()}(${node.args.map(stringifyAST).join(', ')})`;
             return '';
         };
 
@@ -311,6 +327,18 @@ export const evaluateFormula = (expr, variablesObj, enableLog = false) => {
                 return vals.includes(l);
             }
             if (node.type === 'CALL') {
+                // Kiểm tra xem hàm này có giá trị nhập tay từ người dùng không (dành cho Custom Function)
+                const lowerName = node.name.toLowerCase();
+                let manualVal = undefined;
+                for (const k in variablesObj) {
+                    if (k.toLowerCase() === lowerName) { manualVal = variablesObj[k]; break; }
+                }
+                
+                if (manualVal !== undefined && manualVal !== null && manualVal !== '') {
+                    log(`[CUSTOM FUNCTION] ${node.name.toUpperCase()} => Sử dụng giá trị nhập tay: ${manualVal}`);
+                    return Number(manualVal);
+                }
+
                 if (node.name === 'round') {
                     const evaluatedArgs = node.args.map(evalNode);
                     const val = Number(evaluatedArgs[0]);

@@ -146,7 +146,10 @@ export const buildChainTree = (rootFormula, allFormulas, excelColumnsLowerCase =
             type = 'error';
         }
 
-        const variables = currentFormula ? extractVariables(currentFormula.expression) : [];
+        // CHỈ PHÂN RÃ NẾU LÀ TIÊU CHÍ TÍNH TOÁN (BẮT ĐẦU BẰNG TT_)
+        const isTT = String(fName).toUpperCase().startsWith('TT_');
+        const variables = (currentFormula && isTT) ? extractVariables(currentFormula.expression) : [];
+        
         const children = variables.map(v => {
             const childFormula = allFormulas.find(cf => String(cf.targetCol).toLowerCase() === String(v).toLowerCase());
             return buildNode(v, childFormula?.expression || '');

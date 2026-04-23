@@ -10,6 +10,12 @@ body, input, button, select, textarea, th, td, div, span, h1, h2, h3, h4, h5, h6
 .animate-fade-in { animation: fadeIn 0.3s ease-out; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
+.animate-slide-up { animation: slideUp 0.3s ease-out; }
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+.animate-slide-in-right { animation: slideInRight 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+@keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
 /* Scrollbar styling for Light mode */
 .custom-light-scrollbar::-webkit-scrollbar { width: 8px; height: 10px; }
 .custom-light-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
