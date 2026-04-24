@@ -268,7 +268,7 @@ export const evaluateFormula = (expr, variablesObj, enableLog = false) => {
                 for (const k in variablesObj) {
                     if (k.toLowerCase() === lowerName) { v = variablesObj[k]; break; }
                 }
-                if (v === undefined || v === null) return '';
+                if (v === undefined || v === null) return 0;
 
                 let sVal = String(v).trim();
                 let cleanNum = sVal.replace(/[\(\)\-]/g, '');
@@ -280,7 +280,7 @@ export const evaluateFormula = (expr, variablesObj, enableLog = false) => {
                 else if (commaCount === 1) { cleanNum = cleanNum.replace(',', '.'); }
                 else if (dotCount > 1) { cleanNum = cleanNum.replace(/\./g, ''); }
                 
-                if (sVal === '') return '';
+                if (sVal === '') return 0;
                 if (/[a-zA-Z]/.test(sVal) || (sVal.startsWith('0') && sVal.length > 1 && !sVal.includes('.'))) {
                     return sVal; 
                 } else if (!isNaN(cleanNum.replace(/\s+/g, ''))) {

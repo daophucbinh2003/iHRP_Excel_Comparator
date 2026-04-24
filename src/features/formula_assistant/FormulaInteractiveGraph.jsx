@@ -14,7 +14,8 @@ export const FormulaInteractiveGraph = () => {
     const { 
         chainViewFormula, 
         customFormulas, 
-        results
+        results,
+        handleTransferToSandbox
     } = useFormula();
     const { setCurrentStep } = useWorkflow();
 
@@ -248,6 +249,22 @@ export const FormulaInteractiveGraph = () => {
                 </div>
                 <div className="flex items-center gap-4">
                      <div className="hidden lg:block px-3 py-1 rounded bg-white/5 border border-white/10 text-[9px] font-bold text-slate-500 uppercase">Grid: {gridCols} Columns</div>
+                     
+                     {tracerResults[chainViewFormula?.targetCol] !== undefined && (
+                        <button 
+                            onClick={() => {
+                                handleTransferToSandbox(tracerResults[chainViewFormula.targetCol], chainViewFormula);
+                                setCurrentStep('formula');
+                            }} 
+                            className="px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white shadow-2xl shadow-amber-600/20 animate-bounce-subtle"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                            </svg>
+                            Chuyển qua Sandbox
+                        </button>
+                     )}
+
                      <button onClick={runSimulation} disabled={isCalculating} className={`px-8 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all flex items-center gap-2 shadow-2xl ${isCalculating ? 'bg-slate-700 text-slate-500' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20'}`}>{isCalculating ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>} RUN SIMULATION</button>
                 </div>
             </header>

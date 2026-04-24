@@ -53,7 +53,9 @@ const TopNavbar = () => {
                     {/* BUTTON TRỢ LÝ CÔNG THỨC GLOBAL */}
                     <button 
                         onClick={() => {
-                            if (currentStep !== 'formula') { setPreviousStep(currentStep); }
+                            if (currentStep !== 'formula' && currentStep !== 'chain_trace') { 
+                                setPreviousStep(currentStep); 
+                            }
                             setCurrentStep('formula');
                             if (selectedEmpIdForTest) {
                                 setFormulaTab('sandbox');

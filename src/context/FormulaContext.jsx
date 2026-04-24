@@ -5,7 +5,7 @@ import { useComparison } from './ComparisonContext';
 
 const FormulaContext = createContext();
 
-export const FormulaProvider = ({ children }) => {
+export const FormulaProvider = ({ children, selectedEmpIdForTest, setSelectedEmpIdForTest }) => {
   const [formulaTab, setFormulaTab] = useState('define');
   const [newFormulaTarget, setNewFormulaTarget] = useState('');
   const [newFormulaExpr, setNewFormulaExpr] = useState('');
@@ -26,7 +26,8 @@ export const FormulaProvider = ({ children }) => {
     localStorage.setItem('ihrp_formulas', JSON.stringify(customFormulas));
   }, [customFormulas]);
 
-  const [testEmpId, setTestEmpId] = useState('');
+  const testEmpId = selectedEmpIdForTest;
+  const setTestEmpId = setSelectedEmpIdForTest;
   const [testFormulaIdx, setTestFormulaIdx] = useState(-1);
   const [isSandboxComboOpen, setIsSandboxComboOpen] = useState(false);
   const [sandboxSearch, setSandboxSearch] = useState('');
@@ -39,6 +40,10 @@ export const FormulaProvider = ({ children }) => {
   const [calcLogs, setCalcLogs] = useState([]);
   const [showConsole, setShowConsole] = useState(false);
 
+  const [sandboxResult, setSandboxResult] = useState(null);
+  const [compareCol, setCompareCol] = useState('');
+  const [isFromTransferred, setIsFromTransferred] = useState(false);
+
   const [isGraphOpen, setIsGraphOpen] = useState(false);
   const [graphViewFormula, setGraphViewFormula] = useState(null);
   const [isChainOpen, setIsChainOpen] = useState(false);
@@ -48,8 +53,15 @@ export const FormulaProvider = ({ children }) => {
   const [importFiles, setImportFiles] = useState([]);
   const importFormulaRef = useRef(null);
 
+  // New Sandbox Simulation Features
+  const [reportColumns, setReportColumns] = useState([]);
+  const [reportData, setReportData] = useState([]); // To store actual data for validation
+  const [rawFormulaData, setRawFormulaData] = useState([]); // Raw formulas from Excel before mapping
+  const [mappingPreview, setMappingPreview] = useState(null);
+  const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
+
   // Global results for simulation context - can be synced from ComparisonContext
-  const { results: comparisonResults, targetFiles, keyCol } = useComparison();
+  const { results: comparisonResults, targetFiles, keyCol, valCols } = useComparison();
 
   // Helper for sandbox value parsing
   const parseValForSandbox = (val) => {
@@ -148,6 +160,16 @@ export const FormulaProvider = ({ children }) => {
     setCalcLogs(logs || []);
   };
 
+  const handleTransferToSandbox = (result, formula) => {
+    setSandboxResult(result);
+    setIsFromTransferred(true);
+    setFormulaTab('sandbox');
+    // If the formula has a targetCol, set it as default compareCol
+    if (formula && formula.targetCol) {
+      setCompareCol(formula.targetCol);
+    }
+  };
+
   return (
     <FormulaContext.Provider value={{
       formulaTab, setFormulaTab,
@@ -160,6 +182,7 @@ export const FormulaProvider = ({ children }) => {
       formulaSearch, setFormulaSearch,
       selectedIndices, setSelectedIndices,
       testEmpId, setTestEmpId,
+      selectedEmpIdForTest, setSelectedEmpIdForTest,
       testFormulaIdx, setTestFormulaIdx,
       isSandboxComboOpen, setIsSandboxComboOpen,
       sandboxSearch, setSandboxSearch,
@@ -179,9 +202,20 @@ export const FormulaProvider = ({ children }) => {
       importFiles, setImportFiles,
       importFormulaRef,
       results: comparisonResults,
+      keyCol,
+      valCols,
       handlePreviewFormula,
       handleTestFormulaLoad,
-      handleCalculateSandboxFormula
+      handleCalculateSandboxFormula,
+      sandboxResult, setSandboxResult,
+      compareCol, setCompareCol,
+      isFromTransferred, setIsFromTransferred,
+      handleTransferToSandbox,
+      reportColumns, setReportColumns,
+      reportData, setReportData,
+      rawFormulaData, setRawFormulaData,
+      mappingPreview, setMappingPreview,
+      isMappingModalOpen, setIsMappingModalOpen
     }}>
       {children}
     </FormulaContext.Provider>

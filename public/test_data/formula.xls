@@ -1,0 +1,517 @@
+<HTML><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><Head><style>
+	<!---->
+</style></Head><Body><table class="grid" cellspacing="0" cellpadding="0" align="Center" rules="all" bordercolor="#3366CC" border="1" id="_ctl0_dtgList" style="background-color:White;border-color:#3366CC;border-width:1px;border-style:solid;width:100%;border-collapse:collapse;">
+	<tr class="gridHeader" align="center">
+		<td style="width:3%;">STT</td><td align="center">Tên cột</td><td style="width:30%;">Công thức</td><td style="width:5%;">Sắp xếp</td><td style="width:30%;">Ghi chú</td><td style="width:8%;">Tổng hợp</td>
+	</tr><tr class="gridItem">
+		<td align="center">
+                        1
+                    </td><td align="left">&nbsp;Mã NV</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl2:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl2_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1055&nbsp;0&nbsp;E.EmpCode</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;Mã NV</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridAlter">
+		<td align="center">
+                        2
+                    </td><td align="left">&nbsp;Họ và tên</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl3:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl3_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1056&nbsp;1&nbsp;E.EmpName</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;Tên NV</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridItem">
+		<td align="center">
+                        3
+                    </td><td align="left">&nbsp;Đơn vị cấp 1</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl4:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl4_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1057&nbsp;2&nbsp;PITT.TK_DonViCap1</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;PITT.TK_DonViCap1</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridAlter">
+		<td align="center">
+                        4
+                    </td><td align="left">&nbsp;Đơn vị cấp 5</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl5:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl5_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1058&nbsp;3&nbsp;PITT.TK_DonViCap5</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;PITT.TK_DonViCap5</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridItem">
+		<td align="center">
+                        5
+                    </td><td align="left">&nbsp;Đơn vị cấp 6</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl6:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl6_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1059&nbsp;4&nbsp;PITT.TK_DonViCap6</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;PITT.TK_DonViCap6</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridAlter">
+		<td align="center">
+                        6
+                    </td><td align="left">&nbsp;Tình trạng HĐLĐ</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl7:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl7_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1060&nbsp;5&nbsp;PITT.TK_LoaiHDTheoThoiGian</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;PITT.TK_LoaiHDTheoThoiGian</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridItem">
+		<td align="center">
+                        7
+                    </td><td align="left">&nbsp;Mã số thuế</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl8:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl8_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1061&nbsp;6&nbsp;E.MaSoThue</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;E.MaSoThue</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridAlter">
+		<td align="center">
+                        8
+                    </td><td align="left">&nbsp;Căn cước công dân</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl9:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl9_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1062&nbsp;7&nbsp;E.IDNo</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;E.IDNo</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridItem">
+		<td align="center">
+                        9
+                    </td><td align="left">&nbsp;Chức danh</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl10:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl10_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1063&nbsp;8&nbsp;PITT.TK_ViTriCongViec</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;PITT.TK_ViTriCongViec</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridAlter">
+		<td align="center">
+                        10
+                    </td><td align="left">&nbsp;Mã CN hạch toán</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl11:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl11_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1064&nbsp;9&nbsp;PITT.TK_MaHoachToan</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;PITT.TK_MaHoachToan</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridItem">
+		<td align="center">
+                        11
+                    </td><td align="left">&nbsp;Mã PB hạch toán</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl12:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl12_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1065&nbsp;10&nbsp;PITT.TK_MaPBHoachToan</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;PITT.TK_MaPBHoachToan</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridAlter">
+		<td align="center">
+                        12
+                    </td><td align="left">&nbsp;Mã trả lương</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl13:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl13_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1066&nbsp;11&nbsp;E.AccountCode2</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;E.AccountCode2</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridItem">
+		<td align="center">
+                        13
+                    </td><td align="left">&nbsp;Số TK trả lương</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl14:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl14_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1067&nbsp;12&nbsp;E.AccountNo2</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;E.AccountNo2</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridAlter">
+		<td align="center">
+                        14
+                    </td><td align="left">&nbsp;Tổng thu nhập GROSS ngoài lương</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl15:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl15_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1121&nbsp;13&nbsp;PIT.TT_ThueNL</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridItem">
+		<td align="center">
+                        15
+                    </td><td align="left">&nbsp;Tổng Thuế TNCN từ Thu nhập ngoài lương</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl16:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl16_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1122&nbsp;14&nbsp;PIT.TT_ThunhapchiuthueNL</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridAlter">
+		<td align="center">
+                        16
+                    </td><td align="left">&nbsp;Tổng thu nhập GROSS từ lương</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl17:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl17_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1123&nbsp;15&nbsp;PIT.TT_TongThuNhap_Gross</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridItem">
+		<td align="center">
+                        17
+                    </td><td align="left">&nbsp;Tổng Thuế TNCN từ lương</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl18:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl18_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1124&nbsp;16&nbsp;HT_ThueTNCN_LCD + HT_ThueTNCN_LHQ</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridAlter">
+		<td align="center">
+                        18
+                    </td><td align="left">&nbsp;GT tiền thêm giờ vượt được miễn thuế</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl19:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl19_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1126&nbsp;17&nbsp;HT_OTNonPIT</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;GT tiền thêm giờ vượt được miễn thuế - HT_OTNonPIT</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridItem">
+		<td align="center">
+                        19
+                    </td><td align="left">&nbsp;PC Đi lại được miễn thuế</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl20:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl20_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1070&nbsp;18&nbsp;PIT.HT_PCDiLai</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;PIT.HT_PCDiLai</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridAlter">
+		<td align="center">
+                        20
+                    </td><td align="left">&nbsp;PC Điện thoại được miễn thuế</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl21:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl21_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1071&nbsp;19&nbsp;PIT.HT_PCDienThoai</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;PIT.HT_PCDienThoai</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridItem">
+		<td align="center">
+                        21
+                    </td><td align="left">&nbsp;PC độc hại được miễn thuế</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl22:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl22_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1072&nbsp;20&nbsp;PIT.HT_PCDocHai + PIT.HT_PCDocHaiBQL</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;PIT.HT_PCDocHai + PIT.HT_PCDocHaiBQL</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridAlter">
+		<td align="center">
+                        22
+                    </td><td align="left">&nbsp;PC ăn ca được miễn thuế</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl23:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl23_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1074&nbsp;21&nbsp;PIT.HT_TienAnKhongChiuThue</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;PIT.HT_TienAnKhongChiuThue</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridItem">
+		<td align="center">
+                        23
+                    </td><td align="left">&nbsp;Tổng các khoản thu nhập được miễn thuế</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl24:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl24_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1075&nbsp;22&nbsp;PIT.TT_TongThuNhapKhôngChiuThue</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;PIT.TT_TongThuNhapKhôngChiuThue</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridAlter">
+		<td align="center">
+                        24
+                    </td><td align="left">&nbsp;Thu nhập chịu thuế</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl25:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl25_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1076&nbsp;23&nbsp;PIT.TT_ThuNhapChiuThue</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;PIT.TT_ThuNhapChiuThue</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridItem">
+		<td align="center">
+                        25
+                    </td><td align="left">&nbsp;BHXH (NLĐ đóng)</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl26:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl26_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1077&nbsp;24&nbsp;PIT.TT_BHXH_Emp</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;PIT.TT_BHXH_Emp</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridAlter">
+		<td align="center">
+                        26
+                    </td><td align="left">&nbsp;Số tiền GT Bản thân</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl27:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl27_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1078&nbsp;25&nbsp;PIT.TT_GiamTruBanThan</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;PIT.TT_GiamTruBanThan</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridItem">
+		<td align="center">
+                        27
+                    </td><td align="left">&nbsp;Số người phụ thuộc</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl28:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl28_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1079&nbsp;26&nbsp;PIT.TT_SoNguoiPT</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;PIT.TT_SoNguoiPT</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridAlter">
+		<td align="center">
+                        28
+                    </td><td align="left">&nbsp;Số tiền GTGC</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl29:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl29_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1080&nbsp;27&nbsp;PIT.TT_GiamTruNguoiPhuThuoc</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;PIT.TT_GiamTruNguoiPhuThuoc</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridItem">
+		<td align="center">
+                        29
+                    </td><td align="left">&nbsp;Tổng các khoản giảm trừ</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl30:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl30_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1081&nbsp;28&nbsp;PIT.TT_TongGiamTru</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;PIT.TT_TongGiamTru</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridAlter">
+		<td align="center">
+                        30
+                    </td><td align="left">&nbsp;Thu nhập tính thuế (thu nhập chịu thuế - các khoản giảm trừ)</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl31:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl31_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1082&nbsp;29&nbsp;PIT.TT_TongThuNhapTinhThue</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;PIT.TT_TongThuNhapTinhThue</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridItem">
+		<td align="center">
+                        31
+                    </td><td align="left">&nbsp;Phầm trăm tính thuế TNCN</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl32:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl32_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1083&nbsp;30&nbsp;PIT.TT_PhamTramTinhThue</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;PIT.TT_PhanTramTinhThue</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridAlter">
+		<td align="center">
+                        32
+                    </td><td align="left">&nbsp;Thuế TNCN phải nộp</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl33:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl33_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1084&nbsp;31&nbsp;PIT.TT_ThueTNCN</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;PIT.TT_ThueTNCN</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridItem">
+		<td align="center">
+                        33
+                    </td><td align="left">&nbsp;Tổng thuế TNCN tạm khấu trừ trong tháng</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl34:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl34_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1125&nbsp;32&nbsp;PIT.TT_ThueNL+(HT_ThueTNCN_LCD + HT_ThueTNCN_LHQ)</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;Tổng thuế TNCN từ lương + ngoài lương</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr><tr class="gridAlter">
+		<td align="center">
+                        34
+                    </td><td align="left">&nbsp;Thuế TNCN còn lại phải nộp</td><td align="center">
+                        
+                        <input name="_ctl0:dtgList:_ctl35:btnOpenFormula" type="button" id="_ctl0_dtgList__ctl35_btnOpenFormula" class="search" onclick="javascript: OpenFormula_Popup(this);" value="..." style="float:right" />
+                        
+                        
+                    &nbsp;1086&nbsp;33&nbsp;PIT.TT_ThueTNCN - (PIT.TT_ThunhapchiuthueNL+ (PIT.TT_ThunhapchiuthueNL + PIT.TT_ThueNL + PIT.TT_TongThuNhap_Gross))</td><td align="center">
+                        
+                    &nbsp;</td><td align="left">
+                        
+                    &nbsp;PIT.TT_ThueTNCN_ConLai</td><td align="center">
+                        
+                    &nbsp;</td>
+	</tr>
+</table></Body></HTML>
