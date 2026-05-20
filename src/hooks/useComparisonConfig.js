@@ -1,14 +1,15 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { isSTT, normalizeHeader, stringSimilarity } from '../utils/excelUtils'; // Import isSTT
 
-const getAutoCompareColumns = (headers, keyColumn) => {
+const getAutoCompareColumns = (headers, keyCols) => {
     if (!Array.isArray(headers)) return [];
-    return headers.filter(col => col !== keyColumn && !isSTT(col));
+    const keys = Array.isArray(keyCols) ? keyCols : [keyCols];
+    return headers.filter(col => col && !keys.includes(col) && !isSTT(col));
 };
 
 export function useComparisonConfig(baseFile, targetFiles) {
     const [availableCols, setAvailableCols] = useState([]);
-    const [keyCol, setKeyCol] = useState('');
+    const [keyCols, setKeyCols] = useState([]);
     const [valCols, setValCols] = useState([]);
 
     // Advanced Comparison Options
@@ -22,8 +23,8 @@ export function useComparisonConfig(baseFile, targetFiles) {
     // Danh sách cột được lọc theo advSearchCol để hiển thị trong dropdown
     const filteredAdvCols = useMemo(() => {
         const search = advSearchCol.toLowerCase().trim();
-        if (!search) return availableCols;
-        return availableCols.filter(c => c.toLowerCase().includes(search));
+        if (!search) return availableCols.filter(Boolean);
+        return availableCols.filter(c => c && c.toLowerCase().includes(search));
     }, [availableCols, advSearchCol]);
 
     // Column Mapping
@@ -35,20 +36,20 @@ export function useComparisonConfig(baseFile, targetFiles) {
         if (baseFile) {
             const baseHeaders = baseFile.headers;
             setAvailableCols(baseHeaders);
-            if (baseHeaders.length > 0 && !baseHeaders.includes(keyCol)) {
+            if (baseHeaders.length > 0 && keyCols.length === 0) {
                 const potentialKey = baseHeaders.find(h => h.toLowerCase().includes('mã') && (h.toLowerCase().includes('nv') || h.toLowerCase().includes('nhân viên'))) || baseHeaders[0];
-                setKeyCol(potentialKey);
+                setKeyCols(potentialKey ? [potentialKey] : []);
             }
         } else {
             setAvailableCols([]);
-            setKeyCol('');
+            setKeyCols([]);
             setValCols([]);
         }
     }, [baseFile]);
 
     useEffect(() => {
-        setValCols(getAutoCompareColumns(availableCols, keyCol));
-    }, [availableCols, keyCol]);
+        setValCols(getAutoCompareColumns(availableCols, keyCols));
+    }, [availableCols, keyCols]);
 
     useEffect(() => {
         if (baseFile && targetFiles.length > 0) {
@@ -86,7 +87,10 @@ export function useComparisonConfig(baseFile, targetFiles) {
         }
     }, [baseFile, targetFiles]);
 
-    const missingKeyTargets = useMemo(() => targetFiles.filter(tf => !columnMappings[tf.id]?.[keyCol]), [targetFiles, columnMappings, keyCol]);
+    const missingKeyTargets = useMemo(() => {
+        if (!Array.isArray(keyCols) || keyCols.length === 0) return [];
+        return targetFiles.filter(tf => keyCols.some(k => !columnMappings[tf.id]?.[k]));
+    }, [targetFiles, columnMappings, keyCols]);
 
     const getMappingUnique = (colKey) => (baseFile && colKey === 'base') ? baseFile.headers : [];
 
@@ -117,7 +121,7 @@ export function useComparisonConfig(baseFile, targetFiles) {
     }) : [], [baseFile, targetFiles, showMapped, mappingFilters]);
 
     return {
-        availableCols, keyCol, setKeyCol, valCols, setValCols,
+        availableCols, keyCols, setKeyCols, valCols, setValCols,
         advancedRules, setAdvancedRules, showAdvancedOptions, setShowAdvancedOptions,
         advSelectedCol, setAdvSelectedCol, advSearchCol, setAdvSearchCol, isAdvComboOpen, setIsAdvComboOpen,
         advComboRef, filteredAdvCols,

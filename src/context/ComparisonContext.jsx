@@ -19,7 +19,7 @@ export const ComparisonProvider = ({ children, customFormulas, selectedEmpIdForT
     const comparisonResultsProps = useComparisonResults(
         fileHandlerProps.baseFile,
         fileHandlerProps.targetFiles,
-        comparisonConfigProps.keyCol,
+        comparisonConfigProps.keyCols,
         comparisonConfigProps.valCols,
         comparisonConfigProps.columnMappings,
         customFormulas,

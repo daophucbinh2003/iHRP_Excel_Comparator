@@ -1,12 +1,12 @@
 import React from 'react';
-import SearchableSelect from '../../components/common/SearchableSelect';
+import SearchableMultiSelect from '../../components/common/SearchableMultiSelect';
 import { useThemeContext } from '../../context/ThemeContext';
 import { useComparison } from '../../context/ComparisonContext';
 
 
 export function ConfigStep() {
     const { themeUI, isDarkMode } = useThemeContext();
-  const { availableCols, keyCol, setKeyCol, missingKeyTargets, baseFile, setBaseFile, targetFiles, updateTargetName, runMultiComparison, isProcessing, processingMsg, valCols } = useComparison();
+  const { availableCols, keyCols, setKeyCols, missingKeyTargets, baseFile, setBaseFile, targetFiles, updateTargetName, runMultiComparison, isProcessing, processingMsg, valCols } = useComparison();
 
     return (
         <div className="animate-fade-in space-y-5">
@@ -15,17 +15,16 @@ export function ConfigStep() {
                     <label className={`block font-bold ${themeUI.textTitle} mb-2 flex items-center`}>
                         Chọn Cột KEY <span className={`${themeUI.textMuted} font-normal ml-1`}>(Dùng làm mốc)</span>
                     </label>
-                    <SearchableSelect
+                    <SearchableMultiSelect
                         options={availableCols}
-                        value={keyCol}
-                        onChange={setKeyCol}
+                        value={keyCols}
+                        onChange={setKeyCols}
                         placeholder="Chọn cột Key..."
-                        isError={!keyCol}
+                        isError={keyCols.length === 0}
                         isDarkMode={isDarkMode}
-                        allowClear={false}
                         containerClassName="w-full md:w-80"
                     />
-                    {missingKeyTargets.length > 0 && <div className={`mt-3 ${isDarkMode ? 'text-red-400 bg-red-900/20 border-red-800' : 'text-red-600 bg-red-50 border-red-200'} p-2.5 rounded border inline-block font-medium text-xs`}> Cột KEY "{keyCol}" không tồn tại ở: {missingKeyTargets.map(f => f.customName || f.name).join(', ')}.</div>}
+                    {missingKeyTargets.length > 0 && <div className={`mt-3 ${isDarkMode ? 'text-red-400 bg-red-900/20 border-red-800' : 'text-red-600 bg-red-50 border-red-200'} p-2.5 rounded border inline-block font-medium text-xs`}> Cột KEY "{keyCols.join(', ')}" không tồn tại đầy đủ ở: {missingKeyTargets.map(f => f.customName || f.name).join(', ')}.</div>}
                 </div>
 
                 <div className="grid grid-cols-1 gap-5">

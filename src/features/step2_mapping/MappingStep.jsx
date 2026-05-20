@@ -65,16 +65,32 @@ export function MappingStep() {
                                     <tr key={`map-tr-${bCol}`} className={`border-b transition-colors ${hasMissing ? (isDarkMode ? 'bg-red-900/10 hover:bg-red-900/20' : 'bg-red-50/40 hover:bg-red-50') : themeUI.tableRow} ${themeUI.border}`}>
                                         <td className={`px-4 py-2.5 border-r font-bold sticky left-0 z-10 text-xs ${themeUI.border} ${themeUI.tableCellBg} ${themeUI.textMain}`}>{bCol}</td>
                                         {targetFiles.map(tf => {
-                                            const exactMatch = tf.headers.some(h => normalizeHeader(h) === normalizeHeader(bCol));
+                                            const exactMatchHeader = tf.headers.find(h => normalizeHeader(h) === normalizeHeader(bCol));
                                             const currentMap = columnMappings[tf.id]?.[bCol];
-                                            const isMissingCell = !exactMatch && !currentMap;
+                                            
+                                            let displayValue = '';
+                                            let isSuccess = false;
+                                            
+                                            if (currentMap !== undefined) {
+                                                displayValue = currentMap;
+                                                isSuccess = exactMatchHeader && normalizeHeader(currentMap) === normalizeHeader(exactMatchHeader);
+                                            } else if (exactMatchHeader) {
+                                                displayValue = exactMatchHeader;
+                                                isSuccess = true;
+                                            }
+
+                                            const isMissingCell = !displayValue;
                                             return (
                                                 <td key={`map-td-${tf.id}-${bCol}`} className={`p-1.5 border-r align-middle ${themeUI.border}`}>
-                                                    {exactMatch ? (
-                                                        <div className="flex justify-center"><span className={`font-semibold flex items-center px-2 py-1.5 rounded border text-xs ${isDarkMode ? 'bg-green-900/30 text-green-400 border-green-800/50' : 'text-green-600 bg-green-50 border-green-100'}`}><svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg> Trùng tên gốc</span></div>
-                                                    ) : (
-                                                        <SearchableSelect options={tf.headers} value={currentMap} onChange={(newVal) => setColumnMappings(prev => ({ ...prev, [tf.id]: { ...prev[tf.id], [bCol]: newVal } }))} placeholder="Thiếu cột / Bỏ qua" isError={isMissingCell} isDarkMode={isDarkMode} />
-                                                    )}
+                                                    <SearchableSelect 
+                                                        options={tf.headers} 
+                                                        value={displayValue} 
+                                                        onChange={(newVal) => setColumnMappings(prev => ({ ...prev, [tf.id]: { ...prev[tf.id], [bCol]: newVal } }))} 
+                                                        placeholder="Thiếu cột / Bỏ qua" 
+                                                        isError={isMissingCell} 
+                                                        isSuccess={isSuccess}
+                                                        isDarkMode={isDarkMode} 
+                                                    />
                                                 </td>
                                             )
                                         })}

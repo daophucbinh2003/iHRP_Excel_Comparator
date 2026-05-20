@@ -10,7 +10,10 @@ export function ResultsStep() {
     const { themeUI, isDarkMode } = useThemeContext();
   const { setShowAdvancedOptions } = useWorkflow();
   const { selectedEmpIdForTest, setSelectedEmpIdForTest } = useFormula();
-  const { globalFilter, setGlobalFilter, colMenuRef, handleToggleColMenu, showColMenu, colDisplaySearch, setColDisplaySearch, isAllValDisplayed, toggleAllDisplayVal, valCols, displayCols, setDisplayCols, overviewStats, keyCol, getUniqueValues, excelFilters, setExcelFilters, getColDiffCount, handleBadgeClick, activeValCols: visibleValCols, currentResults, handleCopy, renderStackedCell, totalPages, currentPage, rowsPerPage, filteredResults, handleFirstPage, handlePrevPage, handleNextPage, handleLastPage, diffNavTracker, handleExportExcel } = useComparison();
+  const { globalFilter, setGlobalFilter, colMenuRef, handleToggleColMenu, showColMenu, colDisplaySearch, setColDisplaySearch, isAllValDisplayed, toggleAllDisplayVal, valCols, displayCols, setDisplayCols, overviewStats, keyCols, getUniqueValues, excelFilters, setExcelFilters, getColDiffCount, handleBadgeClick, activeValCols: visibleValCols, currentResults, handleCopy, renderStackedCell, totalPages, currentPage, rowsPerPage, filteredResults, handleFirstPage, handlePrevPage, handleNextPage, handleLastPage, diffNavTracker, handleExportGrid, handleExportReport } = useComparison();
+    
+    const [showExportModal, setShowExportModal] = React.useState(false);
+    const [exportCols, setExportCols] = React.useState([]);
     
     // diffNavTracker is a ref in the hook, it's used internally but also in UI for filter clicking.
     // wait, is diffNavTracker exported from hook? Let me check.
@@ -54,9 +57,27 @@ export function ResultsStep() {
                       })}
                    </div>
 
-                   <button onClick={handleExportExcel} className={`flex items-center gap-2 px-3 py-1.5 rounded font-bold text-xs border transition-colors shadow-sm ${isDarkMode ? 'bg-emerald-600 border-emerald-500 hover:bg-emerald-500 text-white' : 'bg-emerald-500 border-emerald-600 hover:bg-emerald-600 text-white'}`} title="Tải xuống tệp Excel chi tiết đã style sẵn">
-                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                      Xuất File Excel
+                   {/* Nút xuất lưới dữ liệu */}
+                   <button
+                     onClick={handleExportGrid}
+                     className={`flex items-center gap-2 px-3 py-1.5 rounded font-bold text-xs border transition-colors shadow-sm ${isDarkMode ? 'bg-sky-700 border-sky-600 hover:bg-sky-600 text-white' : 'bg-sky-500 border-sky-600 hover:bg-sky-600 text-white'}`}
+                     title="Xuất dữ liệu đang hiển thị trên lưới (theo bộ lọc và cột đang bật)"
+                   >
+                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M3 6h18M3 14h18M3 18h18" /></svg>
+                     Xuất Lưới
+                   </button>
+
+                   {/* Nút xuất báo cáo nhiều sheet */}
+                   <button
+                     onClick={() => {
+                       setExportCols(valCols.filter(c => !keyCols.includes(c)));
+                       setShowExportModal(true);
+                     }}
+                     className={`flex items-center gap-2 px-3 py-1.5 rounded font-bold text-xs border transition-colors shadow-sm ${isDarkMode ? 'bg-emerald-600 border-emerald-500 hover:bg-emerald-500 text-white' : 'bg-emerald-500 border-emerald-600 hover:bg-emerald-600 text-white'}`}
+                     title="Xuất báo cáo đầy đủ nhiều sheet: sheet gốc, sheet target, sheet chênh lệch"
+                   >
+                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                     Xuất Báo Cáo
                    </button>
 
                    <button onClick={() => setShowAdvancedOptions(true)} className={`flex items-center gap-2 px-3 py-1.5 rounded font-bold text-xs border transition-colors ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-green-400' : 'bg-white border-gray-300 hover:bg-gray-100 text-green-700'}`}>
@@ -128,14 +149,16 @@ export function ResultsStep() {
                     <table className="w-full text-left border-collapse">
                       <thead className={`${themeUI.tableHead} sticky top-0 z-30 shadow-md`}>
                         <tr>
-                          <th className={`p-0 border-b border-r sticky left-0 z-40 align-top ${themeUI.tableHead} ${themeUI.border} resize-x-handle overflow-auto custom-scrollbar-hide min-w-[140px]`}>
-                            <div className="w-full h-full flex flex-col justify-between">
-                              <ExcelColumnFilter 
-                                  title={keyCol} uniqueValues={getUniqueValues(`V_${keyCol}`)} activeFilters={excelFilters[`V_${keyCol}`]} isDarkMode={isDarkMode}
-                                  onApplyFilter={(vals) => setExcelFilters({...excelFilters, [`V_${keyCol}`]: vals})} 
-                              />
-                            </div>
-                          </th>
+                          {keyCols.map((kCol, idx) => (
+                            <th key={`th-k-${kCol}`} className={`p-0 border-b border-r ${idx === 0 ? 'sticky left-0 z-40' : ''} align-top ${themeUI.tableHead} ${themeUI.border} resize-x-handle overflow-auto custom-scrollbar-hide min-w-[140px]`}>
+                              <div className="w-full h-full flex flex-col justify-between">
+                                <ExcelColumnFilter 
+                                    title={kCol} uniqueValues={getUniqueValues(`V_${kCol}`)} activeFilters={excelFilters[`V_${kCol}`]} isDarkMode={isDarkMode}
+                                    onApplyFilter={(vals) => setExcelFilters({...excelFilters, [`V_${kCol}`]: vals})} 
+                                />
+                              </div>
+                            </th>
+                          ))}
                           {visibleValCols.map(col => (
                             <th key={`th-v-empty-${col}`} className={`p-0 border-b border-r font-bold align-top ${themeUI.border} resize-x-handle overflow-auto custom-scrollbar-hide min-w-[180px]`}>
                               <div className="w-full h-full flex flex-col justify-between">
@@ -173,14 +196,16 @@ export function ResultsStep() {
                     <table className="w-full text-left border-collapse">
                       <thead className={`${themeUI.tableHead} sticky top-0 z-30 shadow-md`}>
                         <tr>
-                          <th className={`p-0 border-b border-r sticky left-0 z-40 align-top ${themeUI.tableHead} ${themeUI.border} resize-x-handle overflow-auto custom-scrollbar-hide min-w-[140px]`}>
-                            <div className="w-full h-full flex flex-col justify-between">
-                              <ExcelColumnFilter 
-                                  title={keyCol} uniqueValues={getUniqueValues(`V_${keyCol}`)} activeFilters={excelFilters[`V_${keyCol}`]} isDarkMode={isDarkMode}
-                                  onApplyFilter={(vals) => setExcelFilters({...excelFilters, [`V_${keyCol}`]: vals})} 
-                              />
-                            </div>
-                          </th>
+                          {keyCols.map((kCol, idx) => (
+                            <th key={`th-k-${kCol}`} className={`p-0 border-b border-r ${idx === 0 ? 'sticky left-0 z-40' : ''} align-top ${themeUI.tableHead} ${themeUI.border} resize-x-handle overflow-auto custom-scrollbar-hide min-w-[140px]`}>
+                              <div className="w-full h-full flex flex-col justify-between">
+                                <ExcelColumnFilter 
+                                    title={kCol} uniqueValues={getUniqueValues(`V_${kCol}`)} activeFilters={excelFilters[`V_${kCol}`]} isDarkMode={isDarkMode}
+                                    onApplyFilter={(vals) => setExcelFilters({...excelFilters, [`V_${kCol}`]: vals})} 
+                                />
+                              </div>
+                            </th>
+                          ))}
                           
                           {visibleValCols.map(col => (
                             <th key={`th-v-${col}`} className={`p-0 border-b border-r font-bold align-top ${themeUI.border} resize-x-handle overflow-auto custom-scrollbar-hide min-w-[180px]`}>
@@ -198,32 +223,36 @@ export function ResultsStep() {
                       
                       <tbody className={themeUI.tableCellBg}>
                         {currentResults.map((row, idx) => (
-                          <tr key={idx} id={`row-${row[keyCol]}`} className={`border-b transition-colors group ${themeUI.tableRow} ${themeUI.border}`}>
-                            <td className={`px-4 py-3 border-r font-bold sticky left-0 z-[5] align-top ${themeUI.border} ${isDarkMode ? 'bg-[#1e293b] text-white shadow-[1px_0_0_0_#334155] group-hover:bg-slate-800' : 'bg-white text-gray-900 shadow-[1px_0_0_0_#e5e7eb] group-hover:bg-blue-50'} transition-colors`}>
-                               <div className="flex items-start gap-2">
-                                  <input 
-                                      type="checkbox" 
-                                      className="mt-1 w-4 h-4 accent-indigo-500 cursor-pointer shrink-0" 
-                                      checked={selectedEmpIdForTest === row[keyCol]}
-                                      onChange={() => setSelectedEmpIdForTest(prev => prev === row[keyCol] ? '' : row[keyCol])}
-                                      title="Chọn nhân viên này để Kiểm tra công thức"
-                                  />
-                                  <div className="flex flex-col min-w-0">
-                                       <span className="cursor-pointer hover:opacity-80 truncate" onClick={() => handleCopy(row[keyCol])} title="Click để Copy">{row[keyCol]}</span>
-                                       {row.status.some(s => s.includes('Thiếu') || s.includes('Lỗi') || s.includes('Chỉ có')) && (
-                                         <div className="mt-2 flex flex-col gap-1 w-max">
-                                           {row.status.map((st, sIdx) => {
-                                             let badgeColor = isDarkMode ? 'bg-red-900/40 text-red-400 border-red-800/50' : 'bg-red-50 text-red-700 border-red-200';
-                                             if (st.includes('Chỉ có')) badgeColor = isDarkMode ? 'bg-blue-900/40 text-blue-400 border-blue-800/50' : 'bg-blue-50 text-blue-700 border-blue-200';
-                                             return <span key={sIdx} className={`px-1.5 py-0.5 rounded font-bold border ${badgeColor} uppercase tracking-wider text-[9px] cursor-pointer hover:opacity-80`} onClick={() => handleCopy(st)} title="Click để Copy">
-                                               {st}
-                                             </span>
-                                           })}
-                                         </div>
-                                       )}
-                                  </div>
-                               </div>
-                            </td>
+                          <tr key={idx} id={`row-${row._compositeKey}`} className={`border-b transition-colors group ${themeUI.tableRow} ${themeUI.border}`}>
+                            {keyCols.map((kCol, kIdx) => (
+                              <td key={`td-k-${kCol}`} className={`px-4 py-3 border-r font-bold ${kIdx === 0 ? 'sticky left-0 z-[5]' : ''} align-top ${themeUI.border} ${kIdx === 0 ? (isDarkMode ? 'bg-[#1e293b] text-white shadow-[1px_0_0_0_#334155] group-hover:bg-slate-800' : 'bg-white text-gray-900 shadow-[1px_0_0_0_#e5e7eb] group-hover:bg-blue-50') : (isDarkMode ? 'text-white' : 'text-gray-900')} transition-colors`}>
+                                 <div className="flex items-start gap-2">
+                                    {kIdx === 0 && (
+                                      <input 
+                                          type="checkbox" 
+                                          className="mt-1 w-4 h-4 accent-indigo-500 cursor-pointer shrink-0" 
+                                          checked={selectedEmpIdForTest === row._compositeKey}
+                                          onChange={() => setSelectedEmpIdForTest(prev => prev === row._compositeKey ? '' : row._compositeKey)}
+                                          title="Chọn nhân viên này để Kiểm tra công thức"
+                                      />
+                                    )}
+                                    <div className="flex flex-col min-w-0">
+                                         <span className="cursor-pointer hover:opacity-80 truncate" onClick={() => handleCopy(row.baseVals[kCol])} title="Click để Copy">{row.baseVals[kCol]}</span>
+                                         {kIdx === 0 && row.status.some(s => s.includes('Thiếu') || s.includes('Lỗi') || s.includes('Chỉ có')) && (
+                                           <div className="mt-2 flex flex-col gap-1 w-max">
+                                             {row.status.map((st, sIdx) => {
+                                               let badgeColor = isDarkMode ? 'bg-red-900/40 text-red-400 border-red-800/50' : 'bg-red-50 text-red-700 border-red-200';
+                                               if (st.includes('Chỉ có')) badgeColor = isDarkMode ? 'bg-blue-900/40 text-blue-400 border-blue-800/50' : 'bg-blue-50 text-blue-700 border-blue-200';
+                                               return <span key={sIdx} className={`px-1.5 py-0.5 rounded font-bold border ${badgeColor} uppercase tracking-wider text-[9px] cursor-pointer hover:opacity-80`} onClick={() => handleCopy(st)} title="Click để Copy">
+                                                 {st}
+                                               </span>
+                                             })}
+                                           </div>
+                                         )}
+                                    </div>
+                                 </div>
+                              </td>
+                            ))}
 
                             {visibleValCols.map(col => (
                               <td key={`td-v-${col}`} className={`px-4 py-3 border-r align-top ${themeUI.textMain} ${themeUI.border}`}>
@@ -258,6 +287,68 @@ export function ResultsStep() {
                   )}
                 </div>
               )}
+              
+              {/* MODAL CHỌN CỘT XUẤT BÁO CÁO */}
+              {showExportModal && (
+                <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50 p-4 animate-fade-in">
+                  <div className={`w-full max-w-lg rounded-xl shadow-2xl flex flex-col max-h-[90vh] ${isDarkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white'}`}>
+                    <div className={`p-4 border-b flex justify-between items-center ${isDarkMode ? 'border-slate-700' : 'border-gray-200'}`}>
+                      <h3 className={`text-lg font-bold ${isDarkMode ? 'text-slate-100' : 'text-gray-800'}`}>Chọn cột xuất báo cáo</h3>
+                      <button onClick={() => setShowExportModal(false)} className={`p-1 rounded-md transition-colors ${isDarkMode ? 'text-slate-400 hover:bg-slate-700' : 'text-gray-500 hover:bg-gray-100'}`}>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                      </button>
+                    </div>
+                    
+                    <div className={`p-4 flex-1 overflow-y-auto ${isDarkMode ? 'custom-dark-scrollbar' : 'custom-light-scrollbar'}`}>
+                      <p className={`text-sm mb-4 ${isDarkMode ? 'text-slate-300' : 'text-gray-600'}`}>
+                        Mặc định sẽ xuất tất cả các cột so sánh. Bạn có thể bỏ chọn những cột không muốn hiển thị trong báo cáo.
+                      </p>
+                      
+                      <div className="space-y-2">
+                        {valCols.filter(c => !keyCols.includes(c)).map(col => {
+                          const isChecked = exportCols.includes(col);
+                          return (
+                            <label key={col} className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer border transition-colors ${isChecked ? (isDarkMode ? 'bg-blue-900/30 border-blue-800' : 'bg-blue-50 border-blue-200') : (isDarkMode ? 'border-slate-700 hover:bg-slate-700/50' : 'border-gray-200 hover:bg-gray-50')}`}>
+                              <input 
+                                type="checkbox" 
+                                className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                checked={isChecked}
+                                onChange={() => {
+                                  if (isChecked) {
+                                    setExportCols(prev => prev.filter(c => c !== col));
+                                  } else {
+                                    setExportCols(prev => [...prev, col]);
+                                  }
+                                }}
+                              />
+                              <span className={`text-sm font-medium ${isDarkMode ? 'text-slate-200' : 'text-gray-700'}`}>{col}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    
+                    <div className={`p-4 border-t flex justify-end gap-3 ${isDarkMode ? 'border-slate-700' : 'border-gray-200'}`}>
+                      <button 
+                        onClick={() => setShowExportModal(false)}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold border transition-colors ${isDarkMode ? 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+                      >
+                        Hủy
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setShowExportModal(false);
+                          handleExportReport(exportCols);
+                        }}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold border transition-colors shadow-sm ${isDarkMode ? 'bg-emerald-600 border-emerald-500 text-white hover:bg-emerald-500' : 'bg-emerald-500 border-emerald-600 text-white hover:bg-emerald-600'}`}
+                      >
+                        Xác nhận xuất
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
             </div>
     );
 }

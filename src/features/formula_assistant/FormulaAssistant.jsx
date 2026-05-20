@@ -6,7 +6,7 @@ import { useThemeContext } from '../../context/ThemeContext';
 import { useFormula } from '../../context/FormulaContext';
 import { useWorkflow } from '../../context/WorkflowContext';
 import { FormulaImportModal } from './FormulaImportModal';
-import { normalizeHeader, isSTT } from '../../utils/excelUtils';
+import { normalizeHeader, isSTT, extractCleanName, stringSimilarity } from '../../utils/excelUtils';
 
 export function FormulaAssistant() {
     const { themeUI, isDarkMode } = useThemeContext();
@@ -21,6 +21,9 @@ export function FormulaAssistant() {
         importFormulaRef,
         handlePreviewFormula, 
         testEmpId, setTestEmpId, 
+        isEmpComboOpen, setIsEmpComboOpen,
+        empSearch, setEmpSearch,
+        empComboRef,
         testFormulaIdx, setTestFormulaIdx, 
         isSandboxComboOpen, setIsSandboxComboOpen, 
         sandboxSearch, setSandboxSearch, 
@@ -42,6 +45,9 @@ export function FormulaAssistant() {
         selectedIndices, setSelectedIndices,
         sandboxResult, setSandboxResult,
         compareCol, setCompareCol,
+        isCompareColComboOpen, setIsCompareColComboOpen,
+        compareColSearch, setCompareColSearch,
+        compareColComboRef,
         isFromTransferred, setIsFromTransferred,
         results, keyCol, valCols,
         selectedEmpIdForTest, setSelectedEmpIdForTest,
@@ -51,6 +57,31 @@ export function FormulaAssistant() {
         mappingPreview, setMappingPreview,
         isMappingModalOpen, setIsMappingModalOpen
     } = useFormula();
+
+    useEffect(() => {
+        const hasGross = customFormulas.some(f => f.targetCol === 'TT_TongThuNhap_Gross');
+        if (!hasGross && customFormulas.length > 0) {
+            const grossFormula = { 
+                targetCol: 'TT_TongThuNhap_Gross', 
+                expression: 'ROUND(HT_ThucLinh_LCD + HT_ThucLinh_LHQ + HT_ThuongHSG + HT_LuongBSTetAm + HT_Thuong3004 + HT_Thuong0106 + HT_Thuong0803 + HT_Thuong2010 + HT_Thuong0209 + HT_LuongBST13 + HT_TetDuongLich + HT_ThuongSNSHB,0) + ROUND(HT_ThueBS_HSG + HT_ThueBS_TetAm + HT_ThueBS_TetDuong  + HT_ThueBS_2707 + HT_ThueBS_LuongT13 + HT_ThueBS_HiemNgheo + HT_ThueBS_TriAnDongGop + HT_ThueBS_TriAnSinhNhatSHB + HT_ThuNhapBS,0)'
+                // Không fix cứng mappedCol ở đây
+            };
+            setCustomFormulas(prev => [...prev, grossFormula]);
+        }
+    }, [customFormulas, setCustomFormulas]);
+    
+    // Tự động đồng bộ Cột so sánh khi mapping thay đổi hoặc công thức được chọn
+    useEffect(() => {
+        if (testFormulaIdx >= 0 && customFormulas[testFormulaIdx]) {
+            const f = customFormulas[testFormulaIdx];
+            if (reportColumns.length > 0 && f.mappedCol) {
+                // Chỉ cập nhật nếu nó đang trống hoặc khác với mapping mới
+                if (compareCol !== f.mappedCol) {
+                    setCompareCol(f.mappedCol);
+                }
+            }
+        }
+    }, [customFormulas, testFormulaIdx, reportColumns, compareCol, setCompareCol]);
     
     const { currentStep, setCurrentStep, setPreviousStep } = useWorkflow();
     
@@ -73,118 +104,118 @@ export function FormulaAssistant() {
             const data = await file.arrayBuffer();
             const workbook = XLSX.read(data);
             const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-            if (jsonData.length > 0) {
-                // 1. Điền giá trị cho ô gộp (chỉ làm cho vùng header và tránh ô gộp quá lớn)
-                const merges = worksheet['!merges'] || [];
-                merges.forEach(merge => {
-                    const { s: { r: sr, c: sc }, e: { r: er, c: ec } } = merge;
-                    
-                    // Chỉ xử lý vùng header (20 dòng đầu)
-                    // Và chỉ xử lý ô gộp "hợp lý" (ngang < 10 cột hoặc dọc)
-                    // Ô gộp quá rộng thường là tiêu đề bảng, không phải tiêu đề cột
-                    const width = ec - sc + 1;
-                    if (sr < 20 && (width < 10 || er > sr)) {
-                        const firstVal = jsonData[sr] ? jsonData[sr][sc] : null;
-                        if (firstVal !== null && firstVal !== undefined && String(firstVal).trim() !== '') {
-                            for (let r = sr; r <= er; r++) {
-                                if (r >= jsonData.length) continue;
-                                if (!jsonData[r]) jsonData[r] = [];
-                                for (let c = sc; c <= ec; c++) {
-                                    // CHỈ ĐIỀN NẾU Ô TRỐNG - TUYỆT ĐỐI KHÔNG GHI ĐÈ DỮ LIỆU ĐANG CÓ
-                                    if (jsonData[r][c] === null || jsonData[r][c] === undefined || String(jsonData[r][c]).trim() === '') {
-                                        jsonData[r][c] = firstVal;
-                                    }
-                                }
-                            }
-                        }
-                    }
+            // Đọc raw dữ liệu (có defval null để phân biệt ô trống)
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null });
+            if (!jsonData.length) return;
+
+            const merges = worksheet['!merges'] || [];
+
+            // Helper: kiểm tra merge "toàn bảng" (width >= 10 trên 1 hàng duy nhất → tiêu đề trang)
+            const isFullWidthMerge = (m) => (m.e.c - m.s.c + 1) >= 10 && m.e.r === m.s.r;
+
+            // Tìm merge thực sự của ô (r,c) — bỏ qua merge tiêu đề trang
+            const findRealMerge = (r, c) =>
+                merges.find(m =>
+                    !isFullWidthMerge(m) &&
+                    r >= m.s.r && r <= m.e.r &&
+                    c >= m.s.c && c <= m.e.c
+                );
+
+            // Lấy giá trị của ô (r,c) từ jsonData — XLSX.js đã fill giá trị từ merge vào ô đầu tiên
+            const getCellVal = (r, c) => {
+                const v = jsonData[r] ? jsonData[r][c] : null;
+                return v !== null && v !== undefined ? String(v).trim() : '';
+            };
+
+            // ---- Step 1: Tìm dòng index (1, 2, 3, ...) ----
+            let indexRowIdx = -1;
+            for (let i = 0; i < Math.min(jsonData.length, 30); i++) {
+                const row = jsonData[i];
+                if (!row) continue;
+                const firstFive = row.filter(x => x !== null && x !== undefined).slice(0, 5);
+                if (firstFive.length < 5) continue;
+                const isIndexRow = firstFive.every((cell, idx) => {
+                    const v = parseInt(cell);
+                    return !isNaN(v) && v === idx + 1;
                 });
-
-                // 2. Tìm dòng chỉ mục (1, 2, 3...)
-                let indexRowIdx = -1;
-                for (let i = 0; i < Math.min(jsonData.length, 25); i++) {
-                    const row = jsonData[i];
-                    if (!row || row.length < 5) continue;
-                    const isIndexRow = row.slice(0, 5).every((cell, idx) => {
-                        const val = parseInt(cell);
-                        return !isNaN(val) && val === (idx + 1);
-                    });
-                    if (isIndexRow) {
-                        indexRowIdx = i;
-                        break;
-                    }
-                }
-
-                // 3. Tìm dòng header đầu tiên
-                let firstHeaderIdx = -1;
-                for (let i = 0; i < Math.min(jsonData.length, 20); i++) {
-                    const row = jsonData[i];
-                    if (!row) continue;
-                    const isHeader = row.some(cell => {
-                        const val = String(cell || '').trim().toLowerCase();
-                        return ['stt', 'mã nv', 'manv', 'mã nhân viên'].includes(val);
-                    });
-                    if (isHeader) {
-                        firstHeaderIdx = i;
-                        break;
-                    }
-                }
-
-                if (firstHeaderIdx !== -1) {
-                    const merges = worksheet['!merges'] || [];
-                    const endLimit = indexRowIdx !== -1 ? indexRowIdx : firstHeaderIdx + 5;
-                    
-                    // Hàm lấy giá trị thực tế của một ô (xử lý cả ô gộp, nhưng bỏ qua ô gộp quá rộng)
-                    const getCellValue = (r, c) => {
-                        const merge = merges.find(m => r >= m.s.r && r <= m.e.r && c >= m.s.c && c <= m.e.c);
-                        if (merge) {
-                            // Nếu ô gộp quá rộng (> 5 cột), coi như không gộp để lấy giá trị thực tại ô đó
-                            // (Tránh trường hợp dòng tiêu đề trang gộp toàn bộ bảng)
-                            const width = merge.e.c - merge.s.c + 1;
-                            if (width > 5 && merge.e.r === merge.s.r) {
-                                return jsonData[r] ? jsonData[r][c] : null;
-                            }
-                            return jsonData[merge.s.r] ? jsonData[merge.s.r][merge.s.c] : null;
-                        }
-                        return jsonData[r] ? jsonData[r][c] : null;
-                    };
-
-                    // 3. GỘP HEADER: Quét tất cả các cột
-                    let finalHeaders = [];
-                    const numCols = Math.max(...jsonData.map(r => (r ? r.length : 0)));
-
-                    for (let c = 0; c < numCols; c++) {
-                        let colParts = [];
-                        for (let r = firstHeaderIdx; r < endLimit; r++) {
-                            const rawVal = getCellValue(r, c);
-                            const val = String(rawVal || '').trim();
-                            if (val && val !== 'null' && !colParts.includes(val)) {
-                                if (val.toLowerCase() === 'stt') {
-                                    if (c === 0) colParts.push(val);
-                                } else {
-                                    colParts.push(val);
-                                }
-                            }
-                        }
-                        finalHeaders[c] = colParts.length > 0 ? colParts.join(' - ') : '';
-                    }
-
-                    const headers = finalHeaders.map(h => String(h || '').trim());
-                    setReportColumns(headers);
-                    
-                    // 4. Xác định điểm bắt đầu dữ liệu
-                    const headerIdx = firstHeaderIdx;
-                    const dataRows = XLSX.utils.sheet_to_json(worksheet, { range: headerIdx });
-                    const filteredData = dataRows.filter((row, rIdx) => {
-                        const absoluteIdx = headerIdx + rIdx + 1;
-                        return absoluteIdx > endLimit;
-                    });
-                    
-                    setReportData(filteredData);
-                }
+                if (isIndexRow) { indexRowIdx = i; break; }
             }
+
+            // ---- Step 2: Xác định vùng header ----
+            // Header bắt đầu từ dòng đầu tiên có "STT"/"Mã NV"
+            // Header kết thúc ở ngay trước indexRowIdx (bao phủ TẤT CẢ dòng header, kể cả sub-header không có STT)
+            let headerStartIdx = -1;
+            const headerEndIdx = indexRowIdx !== -1 ? indexRowIdx - 1 : -1;
+            const searchLimit = indexRowIdx !== -1 ? indexRowIdx : 20;
+
+            for (let i = 0; i < searchLimit; i++) {
+                const row = jsonData[i];
+                if (!row) continue;
+                const hasSTT = row.some(cell => {
+                    const v = String(cell ?? '').trim().toLowerCase();
+                    return ['stt', 'mã nv', 'manv', 'mã nhân viên'].includes(v);
+                });
+                if (hasSTT && headerStartIdx === -1) headerStartIdx = i;
+            }
+
+            if (headerStartIdx === -1) {
+                console.warn('Không tìm được header row');
+                return;
+            }
+
+            // ---- Step 3: Xây dựng tên cột ----
+            // Với mỗi cột c, duyệt từ dòng cuối header lên đầu:
+            //   - Nếu ô (r,c) có giá trị VÀ không phải do merge NGANG từ cột khác → đó là tên cột
+            //   - Nếu ô (r,c) có giá trị nhưng từ merge NGANG (m.s.c != c) → bỏ qua
+            //   - Fallback: lấy giá trị merge NGANG (tên nhóm) nếu không có tên cụ thể
+            const refRow = indexRowIdx !== -1 ? jsonData[indexRowIdx] : jsonData[headerEndIdx];
+            const numCols = refRow ? refRow.length : 36;
+            const finalHeaders = [];
+
+            for (let c = 0; c < numCols; c++) {
+                let leafVal = '';
+                let groupFallback = '';
+
+                for (let r = headerEndIdx; r >= headerStartIdx; r--) {
+                    const val = getCellVal(r, c);
+                    if (!val || val === 'null') continue;
+
+                    // Kiểm tra xem giá trị này có phải từ merge NGANG (từ cột khác) không
+                    const m = findRealMerge(r, c);
+                    if (m && m.s.c !== c) {
+                        // Giá trị này là "tên nhóm" (merge ngang từ cột khác)
+                        // Lưu làm fallback nhưng tiếp tục tìm tên cụ thể hơn
+                        if (!groupFallback) groupFallback = val;
+                        continue;
+                    }
+
+                    // Đây là tên cột thực sự (không phải merge từ cột khác)
+                    leafVal = val;
+                    break;
+                }
+
+                // Dùng tên cột thực, hoặc fallback về tên nhóm
+                finalHeaders[c] = (leafVal || groupFallback || '').trim();
+            }
+
+            setReportColumns(finalHeaders);
+
+            // ---- Step 4: Đọc dữ liệu từ sau vùng header ----
+            // Nếu có dòng index (1,2,3...) thì data bắt đầu từ dòng ngay sau đó
+            // Nếu không có, data bắt đầu từ sau dòng header cuối cùng
+            const actualDataStartIdx = indexRowIdx !== -1 ? indexRowIdx + 1 : headerEndIdx + 1;
+            
+            const filteredData = XLSX.utils.sheet_to_json(worksheet, {
+                header: finalHeaders, // Sử dụng headers đã xử lý merge đa tầng làm key
+                range: actualDataStartIdx,
+                defval: ''
+            });
+
+            setReportData(filteredData);
+
+            // Xóa mapping cũ khi nạp báo cáo mới để đảm bảo tính đúng đắn (theo yêu cầu user)
+            setCustomFormulas(prev => prev.map(f => ({ ...f, mappedCol: undefined })));
         } catch (err) {
             console.error("Import Report Error:", err);
             alert("Lỗi khi đọc file báo cáo.");
@@ -219,38 +250,9 @@ export function FormulaAssistant() {
         e.target.value = '';
     };
 
-    // AUTO-LOAD TEST DATA
+    // AUTO-LOAD TEST DATA (REMOVED)
     useEffect(() => {
-        const loadTestData = async () => {
-            try {
-                // Auto-load Report
-                const reportRes = await fetch('/test_data/report.xlsx');
-                if (reportRes.ok) {
-                    const blob = await reportRes.blob();
-                    const file = new File([blob], "report.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-                    processReportFile(file);
-                }
-                
-                // Auto-load Formula
-                const formulaRes = await fetch('/test_data/formula.xls');
-                if (formulaRes.ok) {
-                    const blob = await formulaRes.blob();
-                    const file = new File([blob], "formula.xls", { type: "application/vnd.ms-excel" });
-                    processFormulaFile(file);
-                }
-
-                // Pre-add the requested formula definition
-                setCustomFormulas(prev => {
-                    const target = 'PIT.TT_TongThuNhapKhôngChiuThue';
-                    if (prev.some(f => f.targetCol === target)) return prev;
-                    return [...prev, { targetCol: target, expression: '0' }];
-                });
-            } catch (err) {
-                console.error("Auto-load test data error:", err);
-            }
-        };
-        
-        loadTestData();
+        // Khởi tạo sạch sẽ
     }, []);
 
     // LOGIC CHẠY ÁNH XẠ KHI CÓ ĐỦ 2 FILE
@@ -273,17 +275,41 @@ export function FormulaAssistant() {
 
         const relevantCols = sttIdx >= 0 ? reportColumns.slice(sttIdx + 1) : reportColumns;
 
-        relevantCols.forEach((reportCol, idx) => {
-            const formulaRow = rawFormulaData[idx];
+        relevantCols.forEach((reportCol) => {
+            // --- SMART MATCHING LOGIC ---
+            // Tìm hàng trong rawFormulaData có tên tương tự nhất với reportCol
+            let bestRow = null;
+            let maxSim = -1;
+            const normReport = normalizeHeader(reportCol);
 
-            if (!formulaRow) {
-                mappings.push({
-                    reportCol: reportCol,
-                    formulaTargetName: '--',
-                    formula: '--',
-                    status: 'missing_formula'
+            rawFormulaData.forEach(row => {
+                const colNameKey = Object.keys(row).find(k => {
+                    const nk = normalizeHeader(k);
+                    return ['têncột', 'tencot', 'columnname', 'target', 'mã'].includes(nk);
                 });
-            } else {
+                if (!colNameKey) return;
+                
+                const targetName = String(row[colNameKey] || '').trim();
+                const normTarget = normalizeHeader(targetName);
+                
+                // 1. Khớp tuyệt đối (sau khi normalize)
+                if (normTarget === normReport) {
+                    maxSim = 1.0;
+                    bestRow = row;
+                    return;
+                }
+                
+                // 2. Độ tương đồng chuỗi
+                const sim = stringSimilarity(normReport, normTarget);
+                if (sim > maxSim) {
+                    maxSim = sim;
+                    bestRow = row;
+                }
+            });
+
+            // Nếu độ tương đồng đủ cao (ngưỡng 0.6), coi như là khớp
+            if (bestRow && maxSim > 0.6) {
+                const formulaRow = bestRow;
                 const colNameKey = Object.keys(formulaRow).find(k => {
                     const nk = normalizeHeader(k);
                     return ['têncột', 'tencot', 'columnname', 'target', 'mã'].includes(nk);
@@ -297,25 +323,27 @@ export function FormulaAssistant() {
                 let formula = String(formulaRow[formulaKey] || '').trim();
                 formula = formula.replace(/^[\d\s]+/, '').trim();
 
-                const isExisting = customFormulas.some(f => 
-                    normalizeHeader(f.targetCol) === normalizeHeader(formula)
-                );
+                const isExisting = customFormulas.some(f => {
+                    const normF = normalizeHeader(extractCleanName(f.targetCol));
+                    const normM = normalizeHeader(extractCleanName(formula));
+                    return normF === normM || normF.includes(normM) || normM.includes(normF);
+                });
 
-                if (isExisting) {
-                    mappings.push({
-                        reportCol: reportCol,
-                        formulaTargetName: formulaTargetName,
-                        formula: formula,
-                        status: 'success'
-                    });
-                } else {
-                    mappings.push({
-                        reportCol: reportCol,
-                        formulaTargetName: formulaTargetName,
-                        formula: formula,
-                        status: 'missing_config'
-                    });
-                }
+                mappings.push({
+                    reportCol: reportCol,
+                    formulaTargetName: formulaTargetName,
+                    formula: formula,
+                    status: isExisting ? 'success' : 'missing_config',
+                    similarity: maxSim
+                });
+            } else {
+                mappings.push({
+                    reportCol: reportCol,
+                    formulaTargetName: '--',
+                    formula: '--',
+                    status: 'missing_formula',
+                    similarity: 0
+                });
             }
         });
 
@@ -352,19 +380,60 @@ export function FormulaAssistant() {
 
     const confirmMapping = () => {
         if (!mappingPreview) return;
-        const newFormulas = [...customFormulas];
+        
+        // Tạo một Map để tra cứu nhanh: normalize(cleanName) -> reportCol
+        const mappingMap = new Map();
         mappingPreview.forEach(m => {
-            if (m.status === 'missing_formula') return; // skip missing ones
-            const existingIdx = newFormulas.findIndex(f => normalizeHeader(f.targetCol) === normalizeHeader(m.reportCol));
-            if (existingIdx >= 0) {
-                newFormulas[existingIdx] = { targetCol: m.reportCol, expression: m.formula };
-            } else {
-                newFormulas.push({ targetCol: m.reportCol, expression: m.formula });
+            if (m.status !== 'missing_formula') {
+                const id = normalizeHeader(extractCleanName(m.formula));
+                if (id) mappingMap.set(id, m.reportCol);
             }
         });
+
+        const newFormulas = customFormulas.map(f => {
+            const id = normalizeHeader(extractCleanName(f.targetCol));
+            if (mappingMap.has(id)) {
+                const reportCol = mappingMap.get(id);
+                // Tìm thông tin gốc trong preview để cập nhật expression nếu cần
+                const m = mappingPreview.find(mp => normalizeHeader(extractCleanName(mp.formula)) === id);
+                return { 
+                    ...f, 
+                    mappedCol: reportCol,
+                    expression: (f.expression && f.expression.length > 30) ? f.expression : (m ? m.formula : f.expression)
+                };
+            }
+            return f;
+        });
+
+        // Xử lý các công thức mới (không có trong customFormulas)
+        mappingPreview.forEach(m => {
+            if (m.status === 'missing_formula') return;
+            const id = normalizeHeader(extractCleanName(m.formula));
+            const isExisting = newFormulas.some(f => normalizeHeader(extractCleanName(f.targetCol)) === id);
+            
+            if (!isExisting) {
+                newFormulas.push({ 
+                    targetCol: m.formulaTargetName && m.formulaTargetName !== '--' ? m.formulaTargetName : extractCleanName(m.formula), 
+                    expression: m.formula,
+                    mappedCol: m.reportCol 
+                });
+            }
+        });
+
         setCustomFormulas(newFormulas);
+        
+        // CẬP NHẬT TRỰC TIẾP: Tìm mapping cho công thức đang chọn ngay lập tức
+        if (testFormulaIdx >= 0 && customFormulas[testFormulaIdx]) {
+            const currentFormula = customFormulas[testFormulaIdx];
+            const id = normalizeHeader(extractCleanName(currentFormula.targetCol));
+            if (mappingMap.has(id)) {
+                setCompareCol(mappingMap.get(id));
+            }
+        }
+
         setIsMappingModalOpen(false);
         setMappingPreview(null);
+        setFormulaTab('sandbox');
         alert(`Đã hoàn tất ánh xạ và cập nhật công thức.`);
     };
 
@@ -510,6 +579,15 @@ export function FormulaAssistant() {
 
     const handleSandboxFormulaSelect = (idx) => {
         setTestFormulaIdx(idx);
+        const formula = customFormulas[idx];
+        if (formula) {
+            // Chỉ gán tên cột nếu đã nạp báo cáo và có mapping thành công
+            if (reportColumns.length > 0 && formula.mappedCol) {
+                setCompareCol(formula.mappedCol);
+            } else {
+                setCompareCol(''); // Để trống nếu chưa nạp báo cáo hoặc chưa ánh xạ
+            }
+        }
         setIsSandboxComboOpen(false);
         setSandboxSearch('');
         setTestResult(null);
@@ -518,38 +596,83 @@ export function FormulaAssistant() {
         setIsFromTransferred(false);
     };
 
+    const handleCompareColSelect = (col) => {
+        setCompareCol(col);
+        setIsCompareColComboOpen(false);
+        setCompareColSearch('');
+    };
+
+    const handleEmpSelect = (id) => {
+        setTestEmpId(id);
+        setIsEmpComboOpen(false);
+        setEmpSearch('');
+        setTestEmpFound(true);
+        setIsCalculated(false);
+    };
+
+    // Lấy danh sách mã nhân viên từ reportData
+    const empOptions = React.useMemo(() => {
+        if (!reportData || reportData.length === 0) return [];
+        const firstRow = reportData[0];
+        const empKey = Object.keys(firstRow).find(k => {
+            const nk = normalizeHeader(k);
+            return ['mãnv', 'manv', 'mãnhânviên', 'manhanvien', 'mã', 'id', 'empid', 'empcode'].includes(nk);
+        });
+        if (!empKey) return [];
+        const ids = reportData.map(r => String(r[empKey] || '').trim()).filter(id => id !== '');
+        return [...new Set(ids)];
+    }, [reportData]);
+
     const [compareStatus, setCompareStatus] = React.useState(null); 
     const [diffAmount, setDiffAmount] = React.useState(null);
+
+    // Hàm helper để lấy giá trị từ Excel/Báo cáo một cách chính xác
+    const getExcelValue = (empId, colName) => {
+        if (!empId || !colName) return undefined;
+        
+        // 1. Tìm trong dữ liệu báo cáo (reportData)
+        if (reportData.length > 0) {
+            const empRow = reportData.find(r => {
+                const idKey = Object.keys(r).find(k => {
+                    const nk = normalizeHeader(k);
+                    return ['mãnv', 'manv', 'mãnhânviên', 'manhanvien', 'mã', 'id', 'empid', 'empcode'].includes(nk);
+                });
+                return idKey && String(r[idKey]).trim() === String(empId).trim();
+            });
+            
+            if (empRow) {
+                // Thử tìm khớp trực tiếp
+                if (empRow[colName] !== undefined) return empRow[colName];
+                // Thử tìm khớp qua normalize
+                const normCol = normalizeHeader(colName);
+                const actualKey = Object.keys(empRow).find(k => normalizeHeader(k) === normCol);
+                if (actualKey) return empRow[actualKey];
+            }
+        }
+
+        // 2. Tìm trong kết quả đối soát (results)
+        const empRow = results?.find(r => String(r[keyCol]) === String(empId).trim());
+        if (empRow) {
+            // Thử tìm trong baseVals (file gốc)
+            const normCol = normalizeHeader(colName);
+            const baseKey = Object.keys(empRow.baseVals).find(k => normalizeHeader(k) === normCol);
+            if (baseKey) return empRow.baseVals[baseKey];
+
+            // Thử tìm trong targetVals (file đối soát)
+            for (const tfId in empRow.targetVals) {
+                const targetKey = Object.keys(empRow.targetVals[tfId]).find(k => normalizeHeader(k) === normCol);
+                if (targetKey) return empRow.targetVals[tfId][targetKey];
+            }
+        }
+        
+        return undefined;
+    };
 
     const handleCompare = () => {
         if (!testEmpId) { alert("Vui lòng chọn Mã nhân viên."); return; }
         if (!compareCol) { alert("Vui lòng chọn Cột dữ liệu muốn so sánh."); return; }
 
-        let excelValRaw = undefined;
-        if (reportData.length > 0) {
-            const empRow = reportData.find(r => {
-                const idKey = Object.keys(r).find(k => normalizeHeader(k) === 'mãnhânviên' || normalizeHeader(k) === 'manhanvien' || normalizeHeader(k) === 'mã' || normalizeHeader(k) === 'id');
-                return idKey && String(r[idKey]).trim() === String(testEmpId).trim();
-            });
-            if (empRow) {
-                excelValRaw = empRow[compareCol];
-            }
-        }
-
-        if (excelValRaw === undefined) {
-            const empRow = results?.find(r => String(r[keyCol]) === String(testEmpId).trim());
-            if (empRow) {
-                excelValRaw = empRow.baseVals[compareCol];
-                if (excelValRaw === undefined) {
-                    for (const tfId in empRow.targetVals) {
-                        if (empRow.targetVals[tfId][compareCol] !== undefined) {
-                            excelValRaw = empRow.targetVals[tfId][compareCol];
-                            break;
-                        }
-                    }
-                }
-            }
-        }
+        const excelValRaw = getExcelValue(testEmpId, compareCol);
 
         if (excelValRaw === undefined) {
             alert(`Không tìm thấy dữ liệu cho nhân viên ${testEmpId} và cột ${compareCol}`);
@@ -822,7 +945,6 @@ export function FormulaAssistant() {
                                         </div>
                                     </div>
                                 </label>
-
                                 <div className="flex items-end pb-1">
                                     <button 
                                         onClick={handleRunMapping}
@@ -835,10 +957,16 @@ export function FormulaAssistant() {
                                 </div>
                             </div>
 
-                            {customFormulas.length === 0 && !isFromTransferred ? (<div className={`p-8 text-center flex-1 flex flex-col items-center justify-center`}><span className="text-4xl mb-3">🧪</span><p className={`${themeUI.textMain} font-bold text-lg`}>Chưa có dữ liệu để kiểm tra.</p><p className={`${themeUI.textMuted} mt-1`}>Vui lòng tạo công thức hoặc chuyển từ Phân tách sang.</p></div>) : (
+                            {customFormulas.length === 0 && !isFromTransferred ? (
+                                <div className={`p-8 text-center flex-1 flex flex-col items-center justify-center`}>
+                                    <span className="text-4xl mb-3">🧪</span>
+                                    <p className={`${themeUI.textMain} font-bold text-lg`}>Chưa có dữ liệu để kiểm tra.</p>
+                                    <p className={`${themeUI.textMuted} mt-1`}>Vui lòng tạo công thức hoặc chuyển từ Phân tách sang.</p>
+                                </div>
+                            ) : (
                                 <div className="flex flex-col gap-6">
-                                    {isFromTransferred && (
-                                        <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex items-center justify-between animate-fade-in">
+                                    {isFromTransferred && sandboxResult !== null && (
+                                        <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex items-center justify-between animate-fade-in mb-2">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-500 shadow-inner">
                                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
@@ -853,46 +981,130 @@ export function FormulaAssistant() {
                                     )}
 
                                     <div className={`p-6 border rounded-2xl flex flex-col lg:grid lg:grid-cols-12 gap-6 shadow-sm shrink-0 ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-indigo-50/30 border-indigo-100/50'}`}>
-                                        <div className="lg:col-span-3 flex flex-col">
-                                            <label className={`font-black text-[10px] mb-2 block uppercase tracking-[0.2em] ${themeUI.textMuted}`}>1. Chọn Nhân Viên</label>
-                                            <input type="text" placeholder="VD: NV001..." value={testEmpId} onChange={handleTestEmpIdChange} className={`w-full p-3 text-sm font-black border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 uppercase tracking-tight transition-all ${themeUI.inputBg} ${isDarkMode ? 'border-slate-600' : 'border-slate-200'}`} />
-                                        </div>
-                                        <div className="lg:col-span-4 flex flex-col">
-                                            <label className={`font-black text-[10px] mb-2 block uppercase tracking-[0.2em] ${themeUI.textMuted}`}>2. Cột dữ liệu so sánh</label>
-                                            <select value={compareCol} onChange={(e) => setCompareCol(e.target.value)} className={`w-full p-3 text-sm font-bold border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all ${themeUI.inputBg} ${isDarkMode ? 'border-slate-600' : 'border-slate-200'}`}>
-                                                <option value="">-- Chọn cột Excel --</option>
-                                                {reportColumns.length > 0 ? (
-                                                    reportColumns.map(col => (
-                                                        <option key={`report-${col}`} value={col}>{col} (Báo cáo)</option>
-                                                    ))
-                                                ) : (
-                                                    valCols.map(col => (
-                                                        <option key={col} value={col}>{col}</option>
-                                                    ))
-                                                )}
-                                            </select>
-                                        </div>
-                                        {!isFromTransferred && (
-                                            <div className="lg:col-span-3 flex flex-col" ref={sandboxComboRef}>
-                                                <label className={`font-black text-[10px] mb-2 block uppercase tracking-[0.2em] ${themeUI.textMuted}`}>3. Công thức (Tùy chọn)</label>
-                                                <div onClick={() => setIsSandboxComboOpen(!isSandboxComboOpen)} className={`w-full p-3 border rounded-xl cursor-pointer flex justify-between items-center font-bold text-sm transition-all ${themeUI.inputBg} ${isSandboxComboOpen ? 'border-indigo-500 ring-2 ring-indigo-500/30' : (isDarkMode ? 'border-slate-600' : 'border-slate-200')}`}><span className={testFormulaIdx >= 0 ? "" : "opacity-40 font-normal truncate"}>{testFormulaIdx >= 0 && customFormulas[testFormulaIdx] ? customFormulas[testFormulaIdx].targetCol : "-- Chọn --"}</span><svg className={`w-4 h-4 transition-transform ${isSandboxComboOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg></div>
-                                                {isSandboxComboOpen && (
-                                                    <div className={`absolute z-50 w-[250px] mt-[75px] border rounded-xl shadow-2xl flex flex-col ${isDarkMode ? 'bg-[#1e293b] border-slate-600' : 'bg-white border-slate-200'}`}>
-                                                        <div className="p-2 border-b dark:border-slate-700">
-                                                            <input type="text" placeholder=" Tìm mã..." value={sandboxSearch} onChange={(e) => setSandboxSearch(e.target.value)} className={`w-full p-2 text-xs border rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 ${themeUI.inputBg}`} autoFocus />
-                                                        </div>
-                                                        <ul className={`max-h-60 overflow-y-auto p-1 ${isDarkMode ? 'custom-dark-scrollbar' : 'custom-light-scrollbar'}`}>
-                                                            {customFormulas.map((f, idx) => ({ ...f, idx })).filter(f => f.targetCol.toUpperCase().startsWith('TT_')).filter(f => f.targetCol.toLowerCase().includes(sandboxSearch.trim().toLowerCase())).map(f => (
-                                                                <li key={`sbox-form-${f.idx}`} onClick={() => handleSandboxFormulaSelect(f.idx)} className={`p-2.5 rounded-lg cursor-pointer text-sm font-medium transition-colors ${isDarkMode ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-indigo-50 text-gray-800'} ${testFormulaIdx === f.idx ? (isDarkMode ? 'bg-indigo-900/50 text-indigo-300' : 'bg-indigo-100 text-indigo-800') : ''}`}>{f.targetCol}</li>
-                                                            ))}
-                                                        </ul>
-                                                    </div>
-                                                )}
+                                        {/* 1. Nhân viên */}
+                                        <div className="lg:col-span-3 flex flex-col relative" ref={empComboRef}>
+                                            <label className={`font-black text-[10px] mb-2 block uppercase tracking-[0.2em] ${themeUI.textMuted}`}>1. Nhân viên</label>
+                                            <div 
+                                                onClick={() => setIsEmpComboOpen(!isEmpComboOpen)} 
+                                                className={`w-full p-3 border rounded-xl cursor-pointer flex justify-between items-center font-bold text-sm transition-all ${themeUI.inputBg} ${isEmpComboOpen ? 'border-indigo-500 ring-2 ring-indigo-500/30' : (isDarkMode ? 'border-slate-600' : 'border-slate-200')}`}
+                                            >
+                                                <span className={testEmpId ? "" : "opacity-40 font-normal truncate"}>
+                                                    {testEmpId || "Chọn NV..."}
+                                                </span>
+                                                <svg className={`w-4 h-4 transition-transform ${isEmpComboOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                                                </svg>
                                             </div>
-                                        )}
-                                        <div className={`${isFromTransferred ? 'lg:col-span-5' : 'lg:col-span-2'} flex items-end gap-3`}>
-                                            {!isFromTransferred && (<button onClick={handleTestFormulaLoad} disabled={!testEmpId || testFormulaIdx < 0} className={`flex-1 h-[46px] rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-2 ${!testEmpId || testFormulaIdx < 0 ? 'bg-slate-700 text-slate-500 opacity-50' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20'}`}>Nạp Biến</button>)}
-                                            <button onClick={handleCompare} disabled={!testEmpId || !compareCol || (!isFromTransferred && !isCalculated)} className={`flex-1 h-[46px] rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-2 ${!testEmpId || !compareCol || (!isFromTransferred && !isCalculated) ? 'bg-slate-700 text-slate-500 opacity-50' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20'}`}><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>So sánh</button>
+                                            
+                                            {isEmpComboOpen && (
+                                                <div className={`absolute left-0 right-0 z-[60] mt-[75px] border rounded-xl shadow-2xl flex flex-col ${isDarkMode ? 'bg-[#1e293b] border-slate-600' : 'bg-white border-slate-200'}`}>
+                                                    <div className="p-2 border-b dark:border-slate-700">
+                                                        <input 
+                                                            type="text" 
+                                                            placeholder="Tìm mã NV..." 
+                                                            value={empSearch} 
+                                                            onChange={(e) => setEmpSearch(e.target.value)} 
+                                                            className={`w-full p-2 text-xs border rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 ${themeUI.inputBg}`} 
+                                                            autoFocus 
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        />
+                                                    </div>
+                                                    <ul className={`max-h-60 overflow-y-auto p-1 ${isDarkMode ? 'custom-dark-scrollbar' : 'custom-light-scrollbar'}`}>
+                                                        {empOptions.filter(id => String(id).toLowerCase().includes(empSearch.trim().toLowerCase())).map(id => (
+                                                            <li key={`emp-opt-${id}`} onClick={(e) => { e.stopPropagation(); handleEmpSelect(id); }} className={`p-2.5 rounded-lg cursor-pointer text-sm font-medium transition-colors ${isDarkMode ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-indigo-50 text-gray-800'} ${testEmpId === id ? (isDarkMode ? 'bg-indigo-900/50 text-indigo-300' : 'bg-indigo-100 text-indigo-800') : ''}`}>{id}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* 2. Cột so sánh */}
+                                        <div className="lg:col-span-4 flex flex-col relative" ref={compareColComboRef}>
+                                            <label className={`font-black text-[10px] mb-2 block uppercase tracking-[0.2em] ${themeUI.textMuted}`}>2. Cột so sánh</label>
+                                            <div 
+                                                onClick={() => setIsCompareColComboOpen(!isCompareColComboOpen)} 
+                                                className={`w-full p-3 border rounded-xl cursor-pointer flex justify-between items-center font-bold text-sm transition-all ${themeUI.inputBg} ${isCompareColComboOpen ? 'border-indigo-500 ring-2 ring-indigo-500/30' : (isDarkMode ? 'border-slate-600' : 'border-slate-200')}`}
+                                            >
+                                                <span className={compareCol ? "" : "opacity-40 font-normal truncate"}>
+                                                    {compareCol || "-- Chọn cột Excel --"}
+                                                </span>
+                                                <svg className={`w-4 h-4 transition-transform ${isCompareColComboOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                                                </svg>
+                                            </div>
+                                            
+                                            {isCompareColComboOpen && (
+                                                <div className={`absolute left-0 right-0 z-50 mt-[75px] border rounded-xl shadow-2xl flex flex-col ${isDarkMode ? 'bg-[#1e293b] border-slate-600' : 'bg-white border-slate-200'}`}>
+                                                    <div className="p-2 border-b dark:border-slate-700">
+                                                        <input 
+                                                            type="text" 
+                                                            placeholder="Tìm tên cột..." 
+                                                            value={compareColSearch} 
+                                                            onChange={(e) => setCompareColSearch(e.target.value)} 
+                                                            className={`w-full p-2 text-xs border rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 ${themeUI.inputBg}`} 
+                                                            autoFocus 
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        />
+                                                    </div>
+                                                    <ul className={`max-h-60 overflow-y-auto p-1 ${isDarkMode ? 'custom-dark-scrollbar' : 'custom-light-scrollbar'}`}>
+                                                        {(reportColumns.length > 0 ? reportColumns : valCols).filter(col => String(col).toLowerCase().includes(compareColSearch.trim().toLowerCase())).map(col => (
+                                                            <li key={`compare-col-${col}`} onClick={(e) => { e.stopPropagation(); handleCompareColSelect(col); }} className={`p-2.5 rounded-lg cursor-pointer text-sm font-medium transition-colors ${isDarkMode ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-indigo-50 text-gray-800'} ${compareCol === col ? (isDarkMode ? 'bg-indigo-900/50 text-indigo-300' : 'bg-indigo-100 text-indigo-800') : ''}`}>{col} {reportColumns.length > 0 ? "(Báo cáo)" : ""}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* 3. Công thức so sánh */}
+                                        <div className="lg:col-span-5 flex flex-col relative" ref={sandboxComboRef}>
+                                            <label className={`font-black text-[10px] mb-2 block uppercase tracking-[0.2em] ${themeUI.textMuted}`}>3. Công thức so sánh</label>
+                                            <div 
+                                                onClick={() => setIsSandboxComboOpen(!isSandboxComboOpen)} 
+                                                className={`w-full p-3 border rounded-xl cursor-pointer flex justify-between items-center font-bold text-sm transition-all ${themeUI.inputBg} ${isSandboxComboOpen ? 'border-indigo-500 ring-2 ring-indigo-500/30' : (isDarkMode ? 'border-slate-600' : 'border-slate-200')}`}
+                                            >
+                                                <span className={testFormulaIdx >= 0 ? "" : "opacity-40 font-normal truncate"}>
+                                                    {testFormulaIdx >= 0 && customFormulas[testFormulaIdx] ? customFormulas[testFormulaIdx].targetCol : "-- Chọn công thức --"}
+                                                </span>
+                                                <svg className={`w-4 h-4 transition-transform ${isSandboxComboOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                                                </svg>
+                                            </div>
+                                            {isSandboxComboOpen && (
+                                                <div className={`absolute left-0 right-0 z-50 mt-[75px] border rounded-xl shadow-2xl flex flex-col ${isDarkMode ? 'bg-[#1e293b] border-slate-600' : 'bg-white border-slate-200'}`}>
+                                                    <div className="p-2 border-b dark:border-slate-700">
+                                                        <input type="text" placeholder=" Tìm mã..." value={sandboxSearch} onChange={(e) => setSandboxSearch(e.target.value)} className={`w-full p-2 text-xs border rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 ${themeUI.inputBg}`} autoFocus onClick={(e) => e.stopPropagation()} />
+                                                    </div>
+                                                    <ul className={`max-h-60 overflow-y-auto p-1 ${isDarkMode ? 'custom-dark-scrollbar' : 'custom-light-scrollbar'}`}>
+                                                        {customFormulas.map((f, idx) => ({ ...f, idx })).filter(f => f.targetCol.toLowerCase().includes(sandboxSearch.trim().toLowerCase()) || (f.mappedCol && f.mappedCol.toLowerCase().includes(sandboxSearch.trim().toLowerCase()))).map(f => (
+                                                            <li key={`sbox-form-${f.idx}`} onClick={(e) => { e.stopPropagation(); handleSandboxFormulaSelect(f.idx); }} className={`p-2.5 rounded-lg cursor-pointer text-sm font-medium transition-colors ${isDarkMode ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-indigo-50 text-gray-800'} ${testFormulaIdx === f.idx ? (isDarkMode ? 'bg-indigo-900/50 text-indigo-300' : 'bg-indigo-100 text-indigo-800') : ''}`}>
+                                                                <div className="flex flex-col">
+                                                                    <span>{f.targetCol}</span>
+                                                                    {f.mappedCol && <span className="text-[10px] opacity-50 italic">→ {f.mappedCol}</span>}
+                                                                </div>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Buttons */}
+                                        <div className="lg:col-span-12 flex gap-3 mt-2">
+                                            <button 
+                                                onClick={handleTestFormulaLoad} 
+                                                disabled={!testEmpId || testFormulaIdx < 0} 
+                                                className={`flex-1 h-[46px] rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-2 ${!testEmpId || testFormulaIdx < 0 ? 'bg-slate-700 text-slate-500 opacity-50' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20'}`}
+                                            >
+                                                Nạp Biến
+                                            </button>
+                                            <button 
+                                                onClick={handleCompare} 
+                                                disabled={!testEmpId || !compareCol || (!isFromTransferred && !isCalculated)} 
+                                                className={`flex-1 h-[46px] rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-2 ${!testEmpId || !compareCol || (!isFromTransferred && !isCalculated) ? 'bg-slate-700 text-slate-500 opacity-50' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20'}`}
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                                                So sánh
+                                            </button>
                                         </div>
                                     </div>
 
@@ -931,18 +1143,7 @@ export function FormulaAssistant() {
                                                             <div className={`w-32 h-32 rounded-3xl flex flex-col items-center justify-center shadow-xl border-2 ${isDarkMode ? 'bg-emerald-950/30 border-emerald-500/30' : 'bg-emerald-50 border-emerald-200'}`}>
                                                                 <span className="text-2xl font-black font-mono tracking-tighter text-white">
                                                                     {(() => {
-                                                                        if (!compareCol || !testEmpId) return '-';
-                                                                        if (reportData.length > 0) {
-                                                                            const empRow = reportData.find(r => {
-                                                                                const idKey = Object.keys(r).find(k => normalizeHeader(k) === 'mãnhânviên' || normalizeHeader(k) === 'manhanvien' || normalizeHeader(k) === 'mã' || normalizeHeader(k) === 'id');
-                                                                                return idKey && String(r[idKey]).trim() === String(testEmpId).trim();
-                                                                            });
-                                                                            if (empRow && empRow[compareCol] !== undefined) return empRow[compareCol];
-                                                                        }
-                                                                        const empRow = results?.find(r => String(r[keyCol]) === String(testEmpId).trim());
-                                                                        if (!empRow) return '-';
-                                                                        let val = empRow.baseVals[compareCol];
-                                                                        if (val === undefined) { for (const tfId in empRow.targetVals) { if (empRow.targetVals[tfId][compareCol] !== undefined) { val = empRow.targetVals[tfId][compareCol]; break; } } }
+                                                                        const val = getExcelValue(testEmpId, compareCol);
                                                                         return val ?? '-';
                                                                     })()}
                                                                 </span>

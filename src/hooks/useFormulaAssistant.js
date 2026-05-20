@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { extractVariables, evaluateFormula } from '../utils/astCompiler';
-import { normalizeHeader } from '../utils/excelUtils';
+import { normalizeHeader, extractCleanName } from '../utils/excelUtils';
 
 export function useFormulaAssistant(baseFile, targetFiles, keyCol, results, setToastMessage, customFormulas, setCustomFormulas) {
     const [formulaTab, setFormulaTab] = useState('define'); // 'define' or 'sandbox'
@@ -163,7 +163,9 @@ export function useFormulaAssistant(baseFile, targetFiles, keyCol, results, setT
             setTestEmpFound(true);
             const formulaObj = customFormulas[testFormulaIdx];
             
-            const actualTargetCol = Object.keys(empRow.baseVals).find(k => normalizeHeader(k) === normalizeHeader(formulaObj.targetCol)) || formulaObj.targetCol;
+            const actualTargetCol = Object.keys(empRow.baseVals).find(k => 
+                normalizeHeader(extractCleanName(k)) === normalizeHeader(extractCleanName(formulaObj.targetCol))
+            ) || formulaObj.targetCol;
             const rawTarget = empRow.baseVals[actualTargetCol];
             
             if (rawTarget !== undefined) {
@@ -178,11 +180,15 @@ export function useFormulaAssistant(baseFile, targetFiles, keyCol, results, setT
             const varsList = extractVariables(formulaObj.expression);
             
             varsList.forEach(colName => {
-                const actualBaseCol = Object.keys(empRow.baseVals).find(k => normalizeHeader(k) === normalizeHeader(colName)) || colName;
+                const actualBaseCol = Object.keys(empRow.baseVals).find(k => 
+                    normalizeHeader(extractCleanName(k)) === normalizeHeader(extractCleanName(colName))
+                ) || colName;
                 
                 let val = ""; 
                 if (targetFileId && empRow.targetVals[targetFileId]) {
-                    const actualTargetColTf = Object.keys(empRow.targetVals[targetFileId]).find(k => normalizeHeader(k) === normalizeHeader(colName)) || colName;
+                    const actualTargetColTf = Object.keys(empRow.targetVals[targetFileId]).find(k => 
+                        normalizeHeader(extractCleanName(k)) === normalizeHeader(extractCleanName(colName))
+                    ) || colName;
                     if (empRow.targetVals[targetFileId][actualTargetColTf] !== undefined && empRow.targetVals[targetFileId][actualTargetColTf] !== ' Bỏ qua/Thiếu') {
                         val = empRow.targetVals[targetFileId][actualTargetColTf];
                     } else if (empRow.baseVals[actualBaseCol] !== undefined) {

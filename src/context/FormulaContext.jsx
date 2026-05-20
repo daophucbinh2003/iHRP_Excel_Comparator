@@ -28,6 +28,9 @@ export const FormulaProvider = ({ children, selectedEmpIdForTest, setSelectedEmp
 
   const testEmpId = selectedEmpIdForTest;
   const setTestEmpId = setSelectedEmpIdForTest;
+  const [isEmpComboOpen, setIsEmpComboOpen] = useState(false);
+  const [empSearch, setEmpSearch] = useState('');
+  const empComboRef = useRef(null);
   const [testFormulaIdx, setTestFormulaIdx] = useState(-1);
   const [isSandboxComboOpen, setIsSandboxComboOpen] = useState(false);
   const [sandboxSearch, setSandboxSearch] = useState('');
@@ -42,6 +45,9 @@ export const FormulaProvider = ({ children, selectedEmpIdForTest, setSelectedEmp
 
   const [sandboxResult, setSandboxResult] = useState(null);
   const [compareCol, setCompareCol] = useState('');
+  const [isCompareColComboOpen, setIsCompareColComboOpen] = useState(false);
+  const [compareColSearch, setCompareColSearch] = useState('');
+  const compareColComboRef = useRef(null);
   const [isFromTransferred, setIsFromTransferred] = useState(false);
 
   const [isGraphOpen, setIsGraphOpen] = useState(false);
@@ -164,11 +170,39 @@ export const FormulaProvider = ({ children, selectedEmpIdForTest, setSelectedEmp
     setSandboxResult(result);
     setIsFromTransferred(true);
     setFormulaTab('sandbox');
-    // If the formula has a targetCol, set it as default compareCol
     if (formula && formula.targetCol) {
-      setCompareCol(formula.targetCol);
+      // Tìm công thức trong danh sách hiện tại để lấy mappedCol nếu có
+      const found = customFormulas.find(f => normalizeHeader(f.targetCol) === normalizeHeader(formula.targetCol));
+      
+      // Chỉ lấy tên thân thiện nếu đã nạp báo cáo và có mapping
+      if (reportColumns.length > 0 && found?.mappedCol) {
+        setCompareCol(found.mappedCol);
+      } else {
+        setCompareCol(''); // Để trống theo yêu cầu user khi chưa nạp hoặc chưa mapping
+      }
+      
+      // Đồng bộ index cho ô chọn Công thức (Cột 3)
+      const idx = customFormulas.findIndex(f => normalizeHeader(f.targetCol) === normalizeHeader(formula.targetCol));
+      if (idx >= 0) setTestFormulaIdx(idx);
     }
   };
+
+  // Close combos on click outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (sandboxComboRef.current && !sandboxComboRef.current.contains(event.target)) {
+        setIsSandboxComboOpen(false);
+      }
+      if (compareColComboRef.current && !compareColComboRef.current.contains(event.target)) {
+        setIsCompareColComboOpen(false);
+      }
+      if (empComboRef.current && !empComboRef.current.contains(event.target)) {
+        setIsEmpComboOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <FormulaContext.Provider value={{
@@ -182,6 +216,9 @@ export const FormulaProvider = ({ children, selectedEmpIdForTest, setSelectedEmp
       formulaSearch, setFormulaSearch,
       selectedIndices, setSelectedIndices,
       testEmpId, setTestEmpId,
+      isEmpComboOpen, setIsEmpComboOpen,
+      empSearch, setEmpSearch,
+      empComboRef,
       selectedEmpIdForTest, setSelectedEmpIdForTest,
       testFormulaIdx, setTestFormulaIdx,
       isSandboxComboOpen, setIsSandboxComboOpen,
@@ -209,6 +246,9 @@ export const FormulaProvider = ({ children, selectedEmpIdForTest, setSelectedEmp
       handleCalculateSandboxFormula,
       sandboxResult, setSandboxResult,
       compareCol, setCompareCol,
+      isCompareColComboOpen, setIsCompareColComboOpen,
+      compareColSearch, setCompareColSearch,
+      compareColComboRef,
       isFromTransferred, setIsFromTransferred,
       handleTransferToSandbox,
       reportColumns, setReportColumns,

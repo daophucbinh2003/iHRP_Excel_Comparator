@@ -68,78 +68,112 @@ const compareCells = (v1, v2, colName, advancedRules) => {
     return normalize(s1) === normalize(s2);
 };
 
-// TỐI ƯU HÓA: Trích xuất dữ liệu bằng cách lặp qua mảng thô (SheetJS utils.sheet_to_json)
-const extractMappedData = (workbook, sheetName, baseColsToExtract, baseKeyColumn, mapping, headerRowIdx) => {
+// Trích xuất dữ liệu — hỗ trợ file có header đa tầng và dòng index (1,2,3...)
+const extractMappedData = (workbook, sheetName, baseColsToExtract, baseKeyColumns, mapping, headerRowIdx, prebuiltHeaders) => {
     const sheet = workbook.Sheets[sheetName];
     if (!sheet || !sheet['!ref']) return [];
 
     const range = XLSX.utils.decode_range(sheet['!ref']);
     const startRow = range.s.r;
-    
-    // Sử dụng sheet_to_json với header: 1 để lấy mảng 2 chiều nhanh nhất
+
+    // Đọc sheet dạng mảng 2D với defval '' để xử lý nhanh
     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-    
+
     const relativeHeaderIdx = headerRowIdx - startRow;
     if (relativeHeaderIdx < 0 || relativeHeaderIdx >= rows.length) return [];
 
-    const headerRow = rows[relativeHeaderIdx];
+    // Xây dựng map tên cột → index trong file
+    // Ưu tiên dùng prebuiltHeaders (đã xử lý merge đa tầng) nếu có
     const colIndices = [];
     const targetToBase = {};
-
-    // Map các cột cần thiết với index tương ứng
-    if (mapping[baseKeyColumn]) targetToBase[mapping[baseKeyColumn]] = baseKeyColumn;
+    baseKeyColumns.forEach(k => {
+        if (mapping[k]) targetToBase[mapping[k]] = k;
+    });
     baseColsToExtract.forEach(baseCol => {
         if (mapping[baseCol]) targetToBase[mapping[baseCol]] = baseCol;
     });
 
-    const seen = {};
-    headerRow.forEach((cellVal, idx) => {
-        let text = cellVal !== undefined && cellVal !== null ? String(cellVal).trim() : '';
-        if (text !== '') {
-            if (seen[text]) {
-                seen[text]++;
-                text = `${text} (${seen[text]})`;
-            } else {
-                seen[text] = 1;
+    if (prebuiltHeaders && prebuiltHeaders.length > 0) {
+        // Dùng prebuiltHeaders (tên cột đã được giải mã từ merge)
+        const seen = {};
+        prebuiltHeaders.forEach((colName, idx) => {
+            let text = colName ? String(colName).trim() : '';
+            if (text !== '') {
+                if (seen[text]) { seen[text]++; text = `${text} (${seen[text]})`; }
+                else seen[text] = 1;
             }
-        }
-        if (targetToBase[text]) {
-            colIndices.push({ idx, baseCol: targetToBase[text] });
-        }
-    });
+            if (targetToBase[text]) {
+                colIndices.push({ idx, baseCol: targetToBase[text] });
+            }
+        });
+    } else {
+        // Fallback: đọc từ dòng header đơn giản (file không có merge phức tạp)
+        const headerRow = rows[relativeHeaderIdx] || [];
+        const seen = {};
+        headerRow.forEach((cellVal, idx) => {
+            let text = cellVal !== undefined && cellVal !== null ? String(cellVal).trim() : '';
+            if (text !== '') {
+                if (seen[text]) { seen[text]++; text = `${text} (${seen[text]})`; }
+                else seen[text] = 1;
+            }
+            if (targetToBase[text]) colIndices.push({ idx, baseCol: targetToBase[text] });
+        });
+    }
+
+    // Tìm dòng bắt đầu data thực sự:
+    // Bỏ qua các dòng ngay sau headerRowIdx nếu là dòng index (1,2,3...) hoặc sub-header
+    let dataStartRelIdx = relativeHeaderIdx + 1;
+    while (dataStartRelIdx < rows.length && dataStartRelIdx <= relativeHeaderIdx + 5) {
+        const row = rows[dataStartRelIdx];
+        if (!row) break;
+        const nonEmpty = row.filter(x => x !== '' && x !== null && x !== undefined);
+        if (nonEmpty.length < 3) { dataStartRelIdx++; continue; }
+        // Kiểm tra dòng index (1,2,3,4,5...)
+        const firstFive = nonEmpty.slice(0, 5);
+        const isIndexRow = firstFive.length >= 3 && firstFive.every((cell, idx) => {
+            const v = parseInt(cell);
+            return !isNaN(v) && v === idx + 1;
+        });
+        if (isIndexRow) { dataStartRelIdx++; continue; }
+        break; // Đây là dòng data thực
+    }
 
     const data = [];
-    for (let i = relativeHeaderIdx + 1; i < rows.length; i++) {
+    for (let i = dataStartRelIdx; i < rows.length; i++) {
         const row = rows[i];
         const rowObj = {};
-        let hasKey = false;
-        let keyValue = "";
-
+        let isValidKey = false;
+        
         colIndices.forEach(({ idx, baseCol }) => {
             const rawVal = row[idx];
-            const val = rawVal !== undefined && rawVal !== null ? String(rawVal).trim() : '';
-            if (baseCol === baseKeyColumn && val !== "") {
-                const keyLower = val.toLowerCase();
-                // Loại bỏ các dòng rác (tài liệu, STT, cộng tổng...)
-                if (!(keyLower.includes('tổng') || keyLower === 'stt' || keyLower === 'mã' || keyLower.includes('mã nhân viên') || keyLower.includes('mã nv'))) {
-                    hasKey = true;
-                    keyValue = val;
-                }
-            }
-            rowObj[baseCol] = val;
+            rowObj[baseCol] = rawVal !== undefined && rawVal !== null ? String(rawVal).trim() : '';
         });
 
-        if (hasKey) {
-            rowObj[baseKeyColumn] = keyValue;
+        // Build composite key
+        const keyParts = [];
+        baseKeyColumns.forEach(k => {
+            const val = rowObj[k] || '';
+            if (val !== '') {
+                const keyLower = val.toLowerCase();
+                if (!(keyLower.includes('tổng') || keyLower === 'stt' || keyLower === 'mã' || keyLower.includes('mã nhân viên') || keyLower.includes('mã nv'))) {
+                    isValidKey = true;
+                }
+            }
+            keyParts.push(val);
+        });
+
+        if (isValidKey) {
+            rowObj._compositeKey = keyParts.join(' _|_ ');
             data.push(rowObj);
         }
     }
     return data;
 };
 
+
 self.onmessage = (e) => {
     try {
-        const { baseFile, targetFiles, columnMappings, keyCol, compareColumns, customFormulas, advancedRules } = e.data;
+        const { baseFile, targetFiles, columnMappings, keyCols, compareColumns, customFormulas, advancedRules } = e.data;
 
         // Xác định các cột cần lấy cho công thức
         const formulaColsNeeded = new Set();
@@ -162,19 +196,19 @@ self.onmessage = (e) => {
         }, {});
 
         self.postMessage({ type: 'progress', message: 'Đang trích xuất dữ liệu gốc...' });
-        const dataGoc = extractMappedData(baseFile.wb, baseFile.sheet, allColsToExtract, keyCol, baseMapping, baseFile.headerRowIdx);
+        const dataGoc = extractMappedData(baseFile.wb, baseFile.sheet, allColsToExtract, keyCols, baseMapping, baseFile.headerRowIdx, baseFile.headers);
         const mapGoc = {};
-        dataGoc.forEach(row => mapGoc[row[keyCol]] = row);
+        dataGoc.forEach(row => mapGoc[row._compositeKey] = row);
 
         const targetMaps = targetFiles.map((tf, idx) => {
             self.postMessage({ type: 'progress', message: `Đang trích xuất dữ liệu file so sánh ${idx + 1}...` });
             const mapping = columnMappings[tf.id] || {};
-            const targetKeyCol = mapping[keyCol];
-            if (!targetKeyCol) return { id: tf.id, name: tf.customName || tf.name, map: {}, hasKey: false, mapping };
+            const targetHasAllKeys = keyCols.every(k => mapping[k]);
+            if (!targetHasAllKeys) return { id: tf.id, name: tf.customName || tf.name, map: {}, hasKey: false, mapping };
 
-            const data = extractMappedData(tf.wb, tf.sheet, allColsToExtract, keyCol, mapping, tf.headerRowIdx);
+            const data = extractMappedData(tf.wb, tf.sheet, allColsToExtract, keyCols, mapping, tf.headerRowIdx, tf.headers);
             const map = {};
-            data.forEach(row => map[row[keyCol]] = row);
+            data.forEach(row => map[row._compositeKey] = row);
             return { id: tf.id, name: tf.customName || tf.name, map, hasKey: true, mapping };
         });
 
@@ -190,9 +224,9 @@ self.onmessage = (e) => {
 
         // TỐI ƯU HÓA: Bộ đệm Unique Values
         const uniqueValues = {
-            [`V_${keyCol}`]: new Set(),
             'V_status': new Set()
         };
+        keyCols.forEach(k => { uniqueValues[`V_${k}`] = new Set(); });
         allColsToExtract.forEach(col => {
             uniqueValues[`V_${col}`] = new Set();
         });
@@ -209,7 +243,7 @@ self.onmessage = (e) => {
             const rowGoc = mapGoc[key];
             let hasDiff = false, isMissing = false, isPerfectMatch = true;
             const diffRow = { 
-                [keyCol]: key, 
+                _compositeKey: key, 
                 status: [], 
                 diffCells: {}, 
                 baseVals: rowGoc || {}, 
@@ -217,7 +251,14 @@ self.onmessage = (e) => {
             };
 
             // Unique Values cho Key
-            uniqueValues[`V_${keyCol}`].add(String(key));
+            if (rowGoc) {
+                keyCols.forEach(k => {
+                    if (rowGoc[k] !== undefined) uniqueValues[`V_${k}`].add(String(rowGoc[k]));
+                });
+            } else {
+                // If rowGoc is missing, we try to split the composite key? 
+                // Or just rely on targetVals later.
+            }
 
             if (!rowGoc) {
                 hasDiff = true; isMissing = true; isPerfectMatch = false;
@@ -242,6 +283,11 @@ self.onmessage = (e) => {
                     diffRow.status.push(st);
                     uniqueValues['V_status'].add(st);
                 } else {
+                    if (!rowGoc) {
+                        keyCols.forEach(k => {
+                            if (rowT[k] !== undefined) uniqueValues[`V_${k}`].add(String(rowT[k]));
+                        });
+                    }
                     // Unique Values cho các cột so sánh
                     if (rowGoc) {
                         compareColumns.forEach(col => {
